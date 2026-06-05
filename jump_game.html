@@ -712,11 +712,9 @@ function update() {
         }
         obstacles.splice(i, 1); // 장애물 제거
         continue;
-      } else if (obstacles[i].type === 'spike') {
-        spikeAnim = { active: true, timer: 0, maxTimer: 75, faceScale: 1 };
       } else {
-        pendingScore = score;
-        gameState = 'namePick';
+        // 모든 장애물: 얼굴 풍선 후 게임오버
+        spikeAnim = { active: true, timer: 0, maxTimer: 75, faceScale: 1 };
       }
     }
   }
