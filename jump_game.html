@@ -34,7 +34,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 // 내부 논리 해상도 고정
 const LOGIC_W = 800;
-const LOGIC_H = 300;
+const LOGIC_H = 500;
 
 canvas.width = LOGIC_W;
 canvas.height = LOGIC_H;
@@ -88,17 +88,17 @@ function hitTest(lx, ly) {
 
 // 배경 구름
 let clouds = [
-  { x: 100, y: 40, w: 80, h: 30 },
-  { x: 350, y: 60, w: 60, h: 25 },
-  { x: 600, y: 30, w: 100, h: 35 },
+  { x: 100, y: 65, w: 80, h: 30 },
+  { x: 350, y: 100, w: 60, h: 25 },
+  { x: 600, y: 50, w: 100, h: 35 },
 ];
 
 // 배경 산
 let mountains = [
-  { x: 0, y: 180, w: 200, h: 120 },
-  { x: 180, y: 195, w: 160, h: 105 },
-  { x: 400, y: 175, w: 220, h: 125 },
-  { x: 620, y: 185, w: 180, h: 115 },
+  { x: 0, y: 290, w: 200, h: 120 },
+  { x: 180, y: 310, w: 160, h: 100 },
+  { x: 400, y: 285, w: 220, h: 125 },
+  { x: 620, y: 300, w: 180, h: 110 },
 ];
 
 // 플레이어
@@ -116,7 +116,7 @@ const player = {
   hatColor: '#c0392b',
 };
 
-const GROUND_Y = 250;
+const GROUND_Y = 410;
 const GRAVITY = 0.6;
 const JUMP_FORCE = -13;
 
@@ -138,7 +138,7 @@ let particles = [];
 
 function spawnItem() {
   const type = Math.random() < 0.5 ? 'shield' : 'slow';
-  items.push({ x: 820, y: GROUND_Y - 80 - Math.random() * 60, w: 28, h: 28, type, pulse: 0 });
+  items.push({ x: 820, y: GROUND_Y - 130 - Math.random() * 110, w: 28, h: 28, type, pulse: 0 });
 }
 
 function spawnObstacle() {
@@ -226,11 +226,11 @@ function checkCollision(a, b) {
 
 // 그리기 함수들
 function drawBackground() {
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, 300);
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, 500);
   skyGrad.addColorStop(0, '#87CEEB');
   skyGrad.addColorStop(1, '#E0F0FF');
   ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, 800, 300);
+  ctx.fillRect(0, 0, 800, 500);
 
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   clouds.forEach(c => {
@@ -251,8 +251,8 @@ function drawBackground() {
     ctx.fillStyle = 'white';
     ctx.beginPath();
     ctx.moveTo(m.x + m.w/2, m.y);
-    ctx.lineTo(m.x + m.w/2 - 20, m.y + 30);
-    ctx.lineTo(m.x + m.w/2 + 20, m.y + 30);
+    ctx.lineTo(m.x + m.w/2 - 28, m.y + 42);
+    ctx.lineTo(m.x + m.w/2 + 28, m.y + 42);
     ctx.fill();
   });
 
@@ -262,7 +262,7 @@ function drawBackground() {
   groundGrad.addColorStop(0.15, '#8B6914');
   groundGrad.addColorStop(1, '#6B4F10');
   ctx.fillStyle = groundGrad;
-  ctx.fillRect(0, GROUND_Y, 800, 50);
+  ctx.fillRect(0, GROUND_Y, 800, 90);
 
   ctx.fillStyle = '#7CBA4A';
   ctx.fillRect(0, GROUND_Y, 800, 6);
@@ -460,23 +460,23 @@ function drawRoundBtn(x, y, w, h, label, bg, fg) {
 
 function drawStartScreen() {
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillRect(0, 0, 800, 300);
+  ctx.fillRect(0, 0, 800, 500);
 
   ctx.fillStyle = 'white';
   ctx.font = 'bold 40px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('🎮 점프 히어로', 400, 75);
+  ctx.fillText('🎮 점프 히어로', 400, 120);
   ctx.font = '15px Arial';
   ctx.fillStyle = '#aaa';
-  ctx.fillText('더블 점프 가능! 장애물을 피하고 아이템을 먹어보세요!', 400, 110);
+  ctx.fillText('더블 점프 가능! 장애물을 피하고 아이템을 먹어보세요!', 400, 185);
   ctx.textAlign = 'left';
 
   activeButtons = [
-    makeBtn(215, 145, 165, 52, () => startGame()),
-    makeBtn(420, 145, 165, 52, () => { gameState = 'ranking'; }),
+    makeBtn(215, 240, 165, 52, () => startGame()),
+    makeBtn(420, 240, 165, 52, () => { gameState = 'ranking'; }),
   ];
-  drawRoundBtn(215, 145, 165, 52, '▶  시작하기', '#27ae60');
-  drawRoundBtn(420, 145, 165, 52, '🏆  랭킹', '#e67e22');
+  drawRoundBtn(215, 240, 165, 52, '▶  시작하기', '#27ae60');
+  drawRoundBtn(420, 240, 165, 52, '🏆  랭킹', '#e67e22');
 
   // 베스트 점수
   const top = getRankings()[0];
@@ -484,25 +484,25 @@ function drawStartScreen() {
     ctx.fillStyle = '#f1c40f';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(`🥇 최고기록: ${top.name} ${top.score}점`, 400, 235);
+    ctx.fillText(`🥇 최고기록: ${top.name} ${top.score}점`, 400, 395);
     ctx.textAlign = 'left';
   }
 }
 
 function drawNamePick() {
   ctx.fillStyle = 'rgba(0,0,0,0.75)';
-  ctx.fillRect(0, 0, 800, 300);
+  ctx.fillRect(0, 0, 800, 500);
 
   ctx.fillStyle = '#e94560';
   ctx.font = 'bold 32px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('게임 오버!', 400, 45);
+  ctx.fillText('게임 오버!', 400, 75);
   ctx.fillStyle = 'white';
   ctx.font = '20px Arial';
-  ctx.fillText(`점수: ${pendingScore}점`, 400, 78);
+  ctx.fillText(`점수: ${pendingScore}점`, 400, 130);
   ctx.fillStyle = '#aaa';
   ctx.font = '15px Arial';
-  ctx.fillText('이름을 선택하세요', 400, 105);
+  ctx.fillText('이름을 선택하세요', 400, 180);
   ctx.textAlign = 'left';
 
   const names = ['유빵꾸', '유똥꼬', '유똥', '조똥'];
@@ -514,7 +514,7 @@ function drawNamePick() {
   names.forEach((nm, i) => {
     const col = i % 2, row = Math.floor(i / 2);
     const bx = startX + col * (bw + gap);
-    const by = 122 + row * (bh + 12);
+    const by = 210 + row * (bh + 20);
     activeButtons.push(makeBtn(bx, by, bw, bh, () => {
       saveRanking(nm, pendingScore);
       gameState = 'ranking';
@@ -525,18 +525,18 @@ function drawNamePick() {
 
 function drawRanking() {
   ctx.fillStyle = 'rgba(0,0,0,0.8)';
-  ctx.fillRect(0, 0, 800, 300);
+  ctx.fillRect(0, 0, 800, 500);
 
   ctx.fillStyle = '#f1c40f';
   ctx.font = 'bold 26px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('🏆 명예의 전당', 400, 32);
+  ctx.fillText('🏆 명예의 전당', 400, 53);
   ctx.textAlign = 'left';
 
   const list = getRankings();
   const medals = ['🥇','🥈','🥉'];
   list.slice(0, 6).forEach((entry, i) => {
-    const y = 60 + i * 32;
+    const y = 95 + i * 55;
     const medal = medals[i] || `${i + 1}.`;
     ctx.fillStyle = i === 0 ? '#f1c40f' : i === 1 ? '#bdc3c7' : i === 2 ? '#cd6133' : '#ccc';
     ctx.font = i < 3 ? 'bold 16px Arial' : '15px Arial';
@@ -550,14 +550,14 @@ function drawRanking() {
   });
   if (list.length === 0) {
     ctx.fillStyle = '#666'; ctx.font = '16px Arial'; ctx.textAlign = 'center';
-    ctx.fillText('아직 기록이 없어요', 400, 150);
+    ctx.fillText('아직 기록이 없어요', 400, 250);
     ctx.textAlign = 'left';
   }
 
   activeButtons = [
-    makeBtn(300, 252, 200, 40, () => { gameState = 'start'; }),
+    makeBtn(300, 435, 200, 40, () => { gameState = 'start'; }),
   ];
-  drawRoundBtn(300, 252, 200, 40, '↩  다시 시작', '#2c3e50');
+  drawRoundBtn(300, 435, 200, 40, '↩  다시 시작', '#2c3e50');
 }
 
 function update() {
