@@ -316,10 +316,11 @@
   </div>
 </div>
 
-<div class="difficulty">
+<div class="difficulty" style="align-items:center">
   <button class="diff-btn active" data-level="easy">쉬움 (4×3)</button>
   <button class="diff-btn" data-level="medium">보통 (4×4)</button>
   <button class="diff-btn" data-level="hard">어려움 (5×4)</button>
+  <button id="ranking-btn" style="background:rgba(241,196,15,0.15);border:2px solid #f1c40f;color:#f1c40f;font-size:clamp(11px,3vw,13px);font-weight:bold;border-radius:20px;padding:6px 14px;cursor:pointer">🏆 랭킹</button>
 </div>
 
 <div id="grid"></div>
@@ -437,6 +438,13 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
   });
 });
 
+document.getElementById('ranking-btn').addEventListener('click', () => {
+  renderRanking();
+  document.getElementById('page-name').style.display = 'none';
+  document.getElementById('page-ranking').style.display = 'flex';
+  document.getElementById('overlay').classList.add('show');
+});
+
 document.getElementById('play-again').addEventListener('click', () => {
   document.getElementById('overlay').classList.remove('show');
   document.getElementById('page-name').style.display = 'flex';
@@ -537,13 +545,13 @@ function checkMatch() {
 function gameComplete() {
   clearInterval(timerInterval);
 
-  const perfectMoves = totalPairs;
-  const ratio = perfectMoves / moves;
+  // 실수 횟수 = 전체 시도 - 페어 수 (완벽하면 0)
+  const mistakes = moves - totalPairs;
   let grade, emoji;
-  if (ratio >= 0.9)      { grade = 'S'; emoji = '🏆'; }
-  else if (ratio >= 0.7) { grade = 'A'; emoji = '⭐'; }
-  else if (ratio >= 0.5) { grade = 'B'; emoji = '👍'; }
-  else                   { grade = 'C'; emoji = '🙂'; }
+  if (mistakes === 0)                    { grade = 'S'; emoji = '🏆'; }
+  else if (mistakes <= totalPairs * 0.4) { grade = 'A'; emoji = '⭐'; }
+  else if (mistakes <= totalPairs)       { grade = 'B'; emoji = '👍'; }
+  else                                   { grade = 'C'; emoji = '🙂'; }
 
   const levelLabel = { easy: '쉬움', medium: '보통', hard: '어려움' }[level];
   pendingResult = { seconds, moves, grade, level: levelLabel };
