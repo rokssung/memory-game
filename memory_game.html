@@ -545,13 +545,12 @@ function checkMatch() {
 function gameComplete() {
   clearInterval(timerInterval);
 
-  // 실수 횟수 = 전체 시도 - 페어 수 (완벽하면 0)
-  const mistakes = moves - totalPairs;
+  // 전체 시도 대비 등급 (쉬움 6쌍 기준: S=9회이하, A=12회이하, B=18회이하)
   let grade, emoji;
-  if (mistakes === 0)                    { grade = 'S'; emoji = '🏆'; }
-  else if (mistakes <= totalPairs * 0.4) { grade = 'A'; emoji = '⭐'; }
-  else if (mistakes <= totalPairs)       { grade = 'B'; emoji = '👍'; }
-  else                                   { grade = 'C'; emoji = '🙂'; }
+  if      (moves <= totalPairs * 1.5) { grade = 'S'; emoji = '🏆'; }
+  else if (moves <= totalPairs * 2.0) { grade = 'A'; emoji = '⭐'; }
+  else if (moves <= totalPairs * 3.0) { grade = 'B'; emoji = '👍'; }
+  else                                { grade = 'C'; emoji = '🙂'; }
 
   const levelLabel = { easy: '쉬움', medium: '보통', hard: '어려움' }[level];
   pendingResult = { seconds, moves, grade, level: levelLabel };
