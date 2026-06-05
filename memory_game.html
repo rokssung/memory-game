@@ -295,6 +295,20 @@
   .ranking-table tr:first-child td { color: #f1c40f; font-weight: bold; }
   .ranking-table tr:nth-child(2) td { color: #bdc3c7; }
   .ranking-table tr:nth-child(3) td { color: #cd6133; }
+
+  .rank-tabs {
+    display: flex; gap: 6px; margin-bottom: 12px; width: 100%;
+  }
+  .rank-tab {
+    flex: 1; padding: 7px 0; font-size: 13px; font-weight: bold;
+    border: 2px solid rgba(255,255,255,0.15); border-radius: 20px;
+    background: transparent; color: #aaa; cursor: pointer;
+    transition: all 0.18s;
+  }
+  .rank-tab.active {
+    border-color: #f1c40f; color: #f1c40f;
+    background: rgba(241,196,15,0.12);
+  }
 </style>
 </head>
 <body>
@@ -349,9 +363,14 @@
     <!-- 랭킹 -->
     <div class="overlay-page" id="page-ranking" style="display:none">
       <div class="ranking-title">🏆 명예의 전당</div>
+      <div class="rank-tabs">
+        <button class="rank-tab active" data-rank-level="easy">쉬움</button>
+        <button class="rank-tab" data-rank-level="medium">보통</button>
+        <button class="rank-tab" data-rank-level="hard">어려움</button>
+      </div>
       <table class="ranking-table">
         <thead>
-          <tr><th>#</th><th>이름</th><th>시간</th><th>시도</th><th>등급</th><th>난이도</th></tr>
+          <tr><th>#</th><th>이름</th><th>시간</th><th>시도</th><th>등급</th></tr>
         </thead>
         <tbody id="ranking-body"></tbody>
       </table>
@@ -401,21 +420,38 @@ function saveMemRanking(name, result) {
   });
   localStorage.setItem('memoryRank', JSON.stringify(list.slice(0, 10)));
 }
-function renderRanking() {
-  const list = getMemRankings();
+let currentRankLevel = 'easy';
+
+function renderRanking(filterLevel) {
+  if (filterLevel) currentRankLevel = filterLevel;
+  const levelLabel = { easy: '쉬움', medium: '보통', hard: '어려움' };
+
+  // 탭 활성화
+  document.querySelectorAll('.rank-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.rankLevel === currentRankLevel);
+  });
+
+  const all = getMemRankings();
+  const list = all.filter(e => e.level === levelLabel[currentRankLevel]);
   const medals = ['🥇','🥈','🥉'];
   const tbody = document.getElementById('ranking-body');
   tbody.innerHTML = list.length === 0
-    ? '<tr><td colspan="6" style="text-align:center;color:#666;padding:16px">아직 기록이 없어요</td></tr>'
+    ? '<tr><td colspan="5" style="text-align:center;color:#666;padding:16px">아직 기록이 없어요</td></tr>'
     : list.map((e, i) => `<tr>
         <td>${medals[i] || i+1}</td>
         <td>${e.name}</td>
         <td>${formatTime(e.seconds)}</td>
         <td>${e.moves}번</td>
         <td>${e.grade}</td>
-        <td>${e.level}</td>
       </tr>`).join('');
 }
+
+// 랭킹 탭 클릭
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('rank-tab')) {
+    renderRanking(e.target.dataset.rankLevel);
+  }
+});
 
 // 이름 선택 버튼
 document.querySelectorAll('.name-btn').forEach(btn => {
@@ -423,7 +459,7 @@ document.querySelectorAll('.name-btn').forEach(btn => {
     if (!pendingResult) return;
     saveMemRanking(btn.dataset.name, pendingResult);
     document.getElementById('page-name').style.display = 'none';
-    renderRanking();
+    renderRanking(level);
     document.getElementById('page-ranking').style.display = 'flex';
   });
 });
@@ -439,7 +475,7 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
 });
 
 document.getElementById('ranking-btn').addEventListener('click', () => {
-  renderRanking();
+  renderRanking(level);
   document.getElementById('page-name').style.display = 'none';
   document.getElementById('page-ranking').style.display = 'flex';
   document.getElementById('overlay').classList.add('show');
