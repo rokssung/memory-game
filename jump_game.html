@@ -276,7 +276,7 @@ function drawPlayer() {
   ctx.ellipse(px + player.w/2, GROUND_Y + 2, player.w/2, 6, 0, 0, Math.PI*2);
   ctx.fill();
 
-  if (player.onGround && started && !gameOver) {
+  if (player.onGround && gameState === 'playing') {
     player.frameTimer++;
     if (player.frameTimer > 8) { player.frame = (player.frame + 1) % 4; player.frameTimer = 0; }
   }
