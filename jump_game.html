@@ -133,11 +133,18 @@ let itemInterval = 280;
 // 파워업 상태
 let powerUp = { type: null, timer: 0, maxTimer: 0 };
 
+// 버섯 - 몸 커짐
+let growAnim = { active: false, timer: 0, maxTimer: 220, scale: 1 };
+
+// 가시 밟기 - 얼굴 풍선
+let spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
+
 // 파티클
 let particles = [];
 
 function spawnItem() {
-  const type = Math.random() < 0.5 ? 'shield' : 'slow';
+  const r = Math.random();
+  const type = r < 0.33 ? 'shield' : r < 0.66 ? 'slow' : 'mushroom';
   items.push({ x: 820, y: GROUND_Y - 130 - Math.random() * 110, w: 28, h: 28, type, pulse: 0 });
 }
 
@@ -183,6 +190,8 @@ function startGame() {
   items = [];
   itemTimer = 0;
   powerUp = { type: null, timer: 0, maxTimer: 0 };
+  growAnim = { active: false, timer: 0, maxTimer: 220, scale: 1 };
+  spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
   particles = [];
   player.y = GROUND_Y - player.h;
   player.vy = 0;
@@ -269,11 +278,20 @@ function drawBackground() {
 }
 
 function drawPlayer() {
+  // 버섯 효과: 몸 전체 스케일
+  const bodyScale = growAnim.active ? growAnim.scale : 1;
+  const bCx = player.x + player.w / 2;
+  const bCy = player.y + player.h;   // 발 기준 스케일
+  ctx.save();
+  ctx.translate(bCx, bCy);
+  ctx.scale(bodyScale, bodyScale);
+  ctx.translate(-bCx, -bCy);
+
   const px = player.x, py = player.y;
 
   ctx.fillStyle = 'rgba(0,0,0,0.15)';
   ctx.beginPath();
-  ctx.ellipse(px + player.w/2, GROUND_Y + 2, player.w/2, 6, 0, 0, Math.PI*2);
+  ctx.ellipse(px + player.w/2, GROUND_Y + 2, player.w/2 * bodyScale, 6, 0, 0, Math.PI*2);
   ctx.fill();
 
   if (player.onGround && gameState === 'playing') {
@@ -303,10 +321,10 @@ function drawPlayer() {
   ctx.fillRect(px + 10, py + 20, 6, 16);
   ctx.fillRect(px + 24, py + 20, 6, 16);
 
-  // 얼굴 이미지 (원형 클립)
+  // 얼굴 이미지 (원형 클립, 가시 풍선 효과 포함)
   const cx = px + player.w / 2;
   const cy = py + 12;
-  const r = 16;
+  const r = 16 * (spikeAnim.active ? spikeAnim.faceScale : 1);
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -327,6 +345,8 @@ function drawPlayer() {
   ctx.beginPath();
   ctx.roundRect(cx - 10, py - 14, 20, 17, [4,4,0,0]);
   ctx.fill();
+
+  ctx.restore(); // bodyScale save 해제
 }
 
 function drawObstacle(obs) {
@@ -369,7 +389,24 @@ function drawItem(item) {
   ctx.save();
   ctx.globalAlpha = glow;
 
-  if (item.type === 'shield') {
+  if (item.type === 'mushroom') {
+    // 버섯
+    ctx.shadowColor = '#e74c3c';
+    ctx.shadowBlur = 10;
+    // 줄기
+    ctx.fillStyle = '#d4a762';
+    ctx.fillRect(cx - 6, cy + 1, 12, 13);
+    // 갓
+    ctx.fillStyle = '#e74c3c';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14, Math.PI, 2 * Math.PI);
+    ctx.fill();
+    // 흰 반점
+    ctx.fillStyle = 'white';
+    [[cx-5, cy-5],[cx+5, cy-5],[cx, cy-10]].forEach(([dx,dy]) => {
+      ctx.beginPath(); ctx.arc(dx, dy, 3, 0, Math.PI*2); ctx.fill();
+    });
+  } else if (item.type === 'shield') {
     ctx.fillStyle = '#FFD700';
     ctx.shadowColor = '#FFD700';
     ctx.shadowBlur = 12;
@@ -424,6 +461,17 @@ function drawHUD() {
   ctx.fillStyle = 'white';
   ctx.font = 'bold 18px Arial';
   ctx.fillText(`점수: ${score}`, 22, 33);
+
+  if (growAnim.active) {
+    const ratio = growAnim.timer / growAnim.maxTimer;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.roundRect(150, 10, 160, 36, 8); ctx.fill();
+    ctx.fillStyle = '#e74c3c';
+    ctx.beginPath(); ctx.roundRect(152, 34, 156 * (1 - ratio), 10, [0,0,4,4]); ctx.fill();
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 15px Arial';
+    ctx.fillText('🍄 몸 커짐', 162, 28);
+  }
 
   if (powerUp.type) {
     const ratio = powerUp.timer / powerUp.maxTimer;
@@ -561,6 +609,17 @@ function drawRanking() {
 }
 
 function update() {
+  // 가시 풍선 애니메이션 진행 중
+  if (spikeAnim.active) {
+    spikeAnim.timer++;
+    spikeAnim.faceScale = 1 + (spikeAnim.timer / spikeAnim.maxTimer) * 3.5;
+    if (spikeAnim.timer >= spikeAnim.maxTimer) {
+      spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
+      pendingScore = score;
+      gameState = 'namePick';
+    }
+    return; // 애니메이션 중엔 게임 일시정지
+  }
   if (gameState !== 'playing') return;
 
   frameCount++;
@@ -569,6 +628,19 @@ function update() {
   if (powerUp.type) {
     powerUp.timer--;
     if (powerUp.timer <= 0) powerUp = { type: null, timer: 0, maxTimer: 0 };
+  }
+
+  // 버섯 성장 타이머
+  if (growAnim.active) {
+    growAnim.timer++;
+    // 먹을 때 1.0→1.8 커졌다가 후반에 1.0으로 복귀
+    const progress = growAnim.timer / growAnim.maxTimer;
+    growAnim.scale = progress < 0.8
+      ? 1.8
+      : 1.8 - (progress - 0.8) / 0.2 * 0.8; // 마지막 20% 동안 줄어듦
+    if (growAnim.timer >= growAnim.maxTimer) {
+      growAnim = { active: false, timer: 0, maxTimer: 220, scale: 1 };
+    }
   }
 
   const baseSpeed = Math.min(14, 4 + score * 0.008);
@@ -615,8 +687,13 @@ function update() {
       continue;
     }
     if (powerUp.type !== 'shield' && checkCollision(player, obstacles[i])) {
-      pendingScore = score;
-      gameState = 'namePick';
+      if (obstacles[i].type === 'spike') {
+        // 가시: 얼굴 풍선 애니메이션 후 게임오버
+        spikeAnim = { active: true, timer: 0, maxTimer: 75, faceScale: 1 };
+      } else {
+        pendingScore = score;
+        gameState = 'namePick';
+      }
     }
   }
 
@@ -628,7 +705,11 @@ function update() {
     }
     if (checkCollision(player, items[i])) {
       const t = items[i].type;
-      powerUp = { type: t, timer: t === 'shield' ? 300 : 240, maxTimer: t === 'shield' ? 300 : 240 };
+      if (t === 'mushroom') {
+        growAnim = { active: true, timer: 0, maxTimer: 220, scale: 1.8 };
+      } else {
+        powerUp = { type: t, timer: t === 'shield' ? 300 : 240, maxTimer: t === 'shield' ? 300 : 240 };
+      }
       for (let j = 0; j < 12; j++) {
         particles.push({
           x: items[i].x + items[i].w / 2,
@@ -636,7 +717,7 @@ function update() {
           vx: (Math.random() - 0.5) * 6,
           vy: (Math.random() - 0.5) * 6,
           life: 30, maxLife: 30,
-          color: t === 'shield' ? '#FFD700' : '#00BFFF',
+          color: t === 'shield' ? '#FFD700' : t === 'mushroom' ? '#e74c3c' : '#00BFFF',
         });
       }
       items.splice(i, 1);
@@ -653,7 +734,7 @@ function update() {
 }
 
 function gameLoop() {
-  ctx.clearRect(0, 0, 800, 300);
+  ctx.clearRect(0, 0, 800, 500);
   drawBackground();
   drawParticles();
   obstacles.forEach(drawObstacle);
