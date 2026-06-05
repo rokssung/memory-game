@@ -241,6 +241,60 @@
   }
 
   .play-again-btn:active { transform: scale(0.95); }
+
+  .overlay-page { width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+  .pick-label {
+    color: #aaa; font-size: 14px; margin: 10px 0 14px;
+  }
+
+  .name-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .name-btn {
+    background: linear-gradient(135deg, #e94560, #c0392b);
+    color: white;
+    font-size: 17px;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  .name-btn:nth-child(2) { background: linear-gradient(135deg, #8e44ad, #6c3483); }
+  .name-btn:nth-child(3) { background: linear-gradient(135deg, #27ae60, #1e8449); }
+  .name-btn:nth-child(4) { background: linear-gradient(135deg, #e67e22, #d35400); }
+  .name-btn:active { transform: scale(0.95); }
+
+  .ranking-title {
+    font-size: 22px; font-weight: bold; color: #f1c40f;
+    margin-bottom: 12px;
+  }
+
+  .ranking-table {
+    width: 100%; border-collapse: collapse; margin-bottom: 14px;
+    font-size: 13px;
+  }
+
+  .ranking-table th {
+    color: #aaa; padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.1);
+    text-align: left;
+  }
+
+  .ranking-table td {
+    padding: 6px 6px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    color: white;
+  }
+
+  .ranking-table tr:first-child td { color: #f1c40f; font-weight: bold; }
+  .ranking-table tr:nth-child(2) td { color: #bdc3c7; }
+  .ranking-table tr:nth-child(3) td { color: #cd6133; }
 </style>
 </head>
 <body>
@@ -272,12 +326,37 @@
 
 <div id="overlay">
   <div class="result-box">
-    <div class="result-emoji">🎉</div>
-    <h2>완료!</h2>
-    <p class="result-stats">시간: <span id="res-time">-</span></p>
-    <p class="result-stats">시도 횟수: <span id="res-moves">-</span></p>
-    <p class="result-stats">등급: <span id="res-grade">-</span></p>
-    <button class="play-again-btn" id="play-again">다시 하기</button>
+
+    <!-- 이름 선택 -->
+    <div class="overlay-page" id="page-name">
+      <div class="result-emoji" id="res-emoji">🎉</div>
+      <h2>완료!</h2>
+      <p class="result-stats" style="margin-bottom:4px">
+        ⏱ <span id="res-time">-</span> &nbsp;|&nbsp;
+        🔄 <span id="res-moves">-</span>번 &nbsp;|&nbsp;
+        🏅 <span id="res-grade">-</span>
+      </p>
+      <p class="pick-label">이름을 선택하세요</p>
+      <div class="name-buttons">
+        <button class="name-btn" data-name="유빵꾸">유빵꾸</button>
+        <button class="name-btn" data-name="유똥꼬">유똥꼬</button>
+        <button class="name-btn" data-name="유똥">유똥</button>
+        <button class="name-btn" data-name="조똥">조똥</button>
+      </div>
+    </div>
+
+    <!-- 랭킹 -->
+    <div class="overlay-page" id="page-ranking" style="display:none">
+      <div class="ranking-title">🏆 명예의 전당</div>
+      <table class="ranking-table">
+        <thead>
+          <tr><th>#</th><th>이름</th><th>시간</th><th>시도</th><th>등급</th><th>난이도</th></tr>
+        </thead>
+        <tbody id="ranking-body"></tbody>
+      </table>
+      <button class="play-again-btn" id="play-again">다시 하기</button>
+    </div>
+
   </div>
 </div>
 
@@ -304,6 +383,49 @@ let timerInterval = null;
 let seconds = 0;
 let locked = false;
 let totalPairs = 0;
+let timerStarted = false;
+let pendingResult = null; // 이름 선택 전 임시 결과
+
+// 랭킹 localStorage
+function getMemRankings() {
+  try { return JSON.parse(localStorage.getItem('memoryRank') || '[]'); }
+  catch { return []; }
+}
+function saveMemRanking(name, result) {
+  const list = getMemRankings();
+  list.push({ name, ...result, date: new Date().toLocaleDateString('ko-KR') });
+  list.sort((a, b) => {
+    if (a.grade !== b.grade) return ['S','A','B','C'].indexOf(a.grade) - ['S','A','B','C'].indexOf(b.grade);
+    return a.seconds - b.seconds;
+  });
+  localStorage.setItem('memoryRank', JSON.stringify(list.slice(0, 10)));
+}
+function renderRanking() {
+  const list = getMemRankings();
+  const medals = ['🥇','🥈','🥉'];
+  const tbody = document.getElementById('ranking-body');
+  tbody.innerHTML = list.length === 0
+    ? '<tr><td colspan="6" style="text-align:center;color:#666;padding:16px">아직 기록이 없어요</td></tr>'
+    : list.map((e, i) => `<tr>
+        <td>${medals[i] || i+1}</td>
+        <td>${e.name}</td>
+        <td>${formatTime(e.seconds)}</td>
+        <td>${e.moves}번</td>
+        <td>${e.grade}</td>
+        <td>${e.level}</td>
+      </tr>`).join('');
+}
+
+// 이름 선택 버튼
+document.querySelectorAll('.name-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!pendingResult) return;
+    saveMemRanking(btn.dataset.name, pendingResult);
+    document.getElementById('page-name').style.display = 'none';
+    renderRanking();
+    document.getElementById('page-ranking').style.display = 'flex';
+  });
+});
 
 // 난이도 버튼
 document.querySelectorAll('.diff-btn').forEach(btn => {
@@ -317,6 +439,8 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
 
 document.getElementById('play-again').addEventListener('click', () => {
   document.getElementById('overlay').classList.remove('show');
+  document.getElementById('page-name').style.display = 'flex';
+  document.getElementById('page-ranking').style.display = 'none';
   startGame();
 });
 
@@ -358,16 +482,22 @@ function startGame() {
     return card;
   });
 
-  // 타이머 시작
-  timerInterval = setInterval(() => {
-    seconds++;
-    document.getElementById('timer').textContent = formatTime(seconds);
-  }, 1000);
+  // 타이머는 첫 카드 클릭 시 시작
+  timerStarted = false;
 }
 
 function onCardClick(card) {
   if (locked) return;
   if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+  // 첫 카드 클릭 시 타이머 시작
+  if (!timerStarted) {
+    timerStarted = true;
+    timerInterval = setInterval(() => {
+      seconds++;
+      document.getElementById('timer').textContent = formatTime(seconds);
+    }, 1000);
+  }
 
   card.classList.add('flipped');
   flipped.push(card);
@@ -407,7 +537,6 @@ function checkMatch() {
 function gameComplete() {
   clearInterval(timerInterval);
 
-  // 등급 계산
   const perfectMoves = totalPairs;
   const ratio = perfectMoves / moves;
   let grade, emoji;
@@ -416,9 +545,12 @@ function gameComplete() {
   else if (ratio >= 0.5) { grade = 'B'; emoji = '👍'; }
   else                   { grade = 'C'; emoji = '🙂'; }
 
-  document.querySelector('.result-emoji').textContent = emoji;
+  const levelLabel = { easy: '쉬움', medium: '보통', hard: '어려움' }[level];
+  pendingResult = { seconds, moves, grade, level: levelLabel };
+
+  document.getElementById('res-emoji').textContent = emoji;
   document.getElementById('res-time').textContent = formatTime(seconds);
-  document.getElementById('res-moves').textContent = `${moves}번`;
+  document.getElementById('res-moves').textContent = moves;
   document.getElementById('res-grade').textContent = grade;
 
   setTimeout(() => {
