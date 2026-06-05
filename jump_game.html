@@ -133,8 +133,10 @@ let itemInterval = 280;
 // 파워업 상태
 let powerUp = { type: null, timer: 0, maxTimer: 0 };
 
-// 버섯 - 몸 커짐
-let growAnim = { active: false, timer: 0, maxTimer: 220, scale: 1 };
+// 버섯 - 몸 커짐 + 1번 봐주기
+let growAnim = { active: false, timer: 0, maxTimer: 260, scale: 1 };
+let mushroomLife = false;   // 버섯 먹으면 한 번 봐주기
+let lastShieldScore = -500; // 500점마다 무적 1회 허용
 
 // 가시 밟기 - 얼굴 풍선
 let spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
@@ -143,8 +145,15 @@ let spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
 let particles = [];
 
 function spawnItem() {
-  const r = Math.random();
-  const type = r < 0.33 ? 'shield' : r < 0.66 ? 'slow' : 'mushroom';
+  let type;
+  // 무적: 500점마다 한 번, 10% 확률 트리거
+  if (Math.random() < 0.1 && score >= lastShieldScore + 500) {
+    type = 'shield';
+    lastShieldScore = score;
+  } else {
+    // 버섯 60%, 슬로우 40%
+    type = Math.random() < 0.6 ? 'mushroom' : 'slow';
+  }
   items.push({ x: 820, y: GROUND_Y - 130 - Math.random() * 110, w: 28, h: 28, type, pulse: 0 });
 }
 
@@ -190,7 +199,9 @@ function startGame() {
   items = [];
   itemTimer = 0;
   powerUp = { type: null, timer: 0, maxTimer: 0 };
-  growAnim = { active: false, timer: 0, maxTimer: 220, scale: 1 };
+  growAnim = { active: false, timer: 0, maxTimer: 260, scale: 1 };
+  mushroomLife = false;
+  lastShieldScore = -500;
   spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
   particles = [];
   player.y = GROUND_Y - player.h;
@@ -470,7 +481,7 @@ function drawHUD() {
     ctx.beginPath(); ctx.roundRect(152, 34, 156 * (1 - ratio), 10, [0,0,4,4]); ctx.fill();
     ctx.fillStyle = '#e74c3c';
     ctx.font = 'bold 15px Arial';
-    ctx.fillText('🍄 몸 커짐', 162, 28);
+    ctx.fillText(mushroomLife ? '🍄 x3  ❤️ 봐주기' : '🍄 x3', 162, 28);
   }
 
   if (powerUp.type) {
@@ -639,7 +650,7 @@ function update() {
       ? 1.8
       : 1.8 - (progress - 0.8) / 0.2 * 0.8; // 마지막 20% 동안 줄어듦
     if (growAnim.timer >= growAnim.maxTimer) {
-      growAnim = { active: false, timer: 0, maxTimer: 220, scale: 1 };
+      growAnim = { active: false, timer: 0, maxTimer: 260, scale: 1 }; mushroomLife = false;
     }
   }
 
@@ -687,8 +698,21 @@ function update() {
       continue;
     }
     if (powerUp.type !== 'shield' && checkCollision(player, obstacles[i])) {
-      if (obstacles[i].type === 'spike') {
-        // 가시: 얼굴 풍선 애니메이션 후 게임오버
+      if (mushroomLife) {
+        // 버섯 봐주기 1회 소진
+        mushroomLife = false;
+        growAnim = { active: false, timer: 0, maxTimer: 260, scale: 1 };
+        // 충격 파티클
+        for (let j = 0; j < 14; j++) {
+          particles.push({
+            x: player.x + player.w / 2, y: player.y + player.h / 2,
+            vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+            life: 28, maxLife: 28, color: '#e74c3c',
+          });
+        }
+        obstacles.splice(i, 1); // 장애물 제거
+        continue;
+      } else if (obstacles[i].type === 'spike') {
         spikeAnim = { active: true, timer: 0, maxTimer: 75, faceScale: 1 };
       } else {
         pendingScore = score;
@@ -706,7 +730,8 @@ function update() {
     if (checkCollision(player, items[i])) {
       const t = items[i].type;
       if (t === 'mushroom') {
-        growAnim = { active: true, timer: 0, maxTimer: 220, scale: 1.8 };
+        growAnim = { active: true, timer: 0, maxTimer: 260, scale: 3.0 };
+        mushroomLife = true;
       } else {
         powerUp = { type: t, timer: t === 'shield' ? 300 : 240, maxTimer: t === 'shield' ? 300 : 240 };
       }
