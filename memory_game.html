@@ -406,19 +406,23 @@ let totalPairs = 0;
 let timerStarted = false;
 let pendingResult = null; // 이름 선택 전 임시 결과
 
-// 랭킹 localStorage
-function getMemRankings() {
-  try { return JSON.parse(localStorage.getItem('memoryRank') || '[]'); }
+// 랭킹 localStorage (난이도별 독립 저장)
+const RANK_KEY = lv => 'memRank_' + lv; // easy/medium/hard 별도 키
+function getMemRankings(lv) {
+  try { return JSON.parse(localStorage.getItem(RANK_KEY(lv)) || '[]'); }
   catch { return []; }
 }
 function saveMemRanking(name, result) {
-  const list = getMemRankings();
+  // result.level = '쉬움'|'보통'|'어려움' → 키로 변환
+  const lvMap = { '쉬움': 'easy', '보통': 'medium', '어려움': 'hard' };
+  const lv = lvMap[result.level] || 'easy';
+  const list = getMemRankings(lv);
   list.push({ name, ...result, date: new Date().toLocaleDateString('ko-KR') });
   list.sort((a, b) => {
     if (a.grade !== b.grade) return ['S','A','B','C'].indexOf(a.grade) - ['S','A','B','C'].indexOf(b.grade);
     return a.seconds - b.seconds;
   });
-  localStorage.setItem('memoryRank', JSON.stringify(list.slice(0, 10)));
+  localStorage.setItem(RANK_KEY(lv), JSON.stringify(list.slice(0, 10)));
 }
 let currentRankLevel = 'easy';
 
@@ -431,8 +435,7 @@ function renderRanking(filterLevel) {
     t.classList.toggle('active', t.dataset.rankLevel === currentRankLevel);
   });
 
-  const all = getMemRankings();
-  const list = all.filter(e => e.level === levelLabel[currentRankLevel]);
+  const list = getMemRankings(currentRankLevel);
   const medals = ['🥇','🥈','🥉'];
   const tbody = document.getElementById('ranking-body');
   tbody.innerHTML = list.length === 0
