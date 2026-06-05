@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>메모리 게임</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a2e;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 16px 12px 24px;
+    font-family: 'Arial', sans-serif;
+    color: white;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  h1 {
+    font-size: clamp(20px, 6vw, 28px);
+    color: #e94560;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+
+  /* 상단 HUD */
+  .hud {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .hud-box {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 6px 18px;
+    text-align: center;
+    min-width: 80px;
+  }
+
+  .hud-label {
+    font-size: 10px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .hud-value {
+    font-size: clamp(18px, 5vw, 24px);
+    font-weight: bold;
+    color: #e94560;
+  }
+
+  /* 난이도 버튼 */
+  .difficulty {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .diff-btn {
+    background: rgba(255,255,255,0.08);
+    border: 2px solid transparent;
+    color: #ccc;
+    font-size: clamp(12px, 3.5vw, 14px);
+    font-weight: bold;
+    border-radius: 20px;
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .diff-btn.active {
+    border-color: #e94560;
+    color: #e94560;
+    background: rgba(233,69,96,0.12);
+  }
+
+  /* 카드 그리드 */
+  #grid {
+    display: grid;
+    gap: clamp(6px, 2vw, 10px);
+    max-width: min(500px, 100vw - 24px);
+    width: 100%;
+  }
+
+  .card {
+    aspect-ratio: 1;
+    cursor: pointer;
+    perspective: 600px;
+    border-radius: 12px;
+  }
+
+  .card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+  }
+
+  .card.flipped .card-inner,
+  .card.matched .card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .card-front,
+  .card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card-front {
+    background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+    border: 2px solid rgba(255,255,255,0.1);
+    font-size: clamp(20px, 6vw, 32px);
+    color: rgba(255,255,255,0.2);
+  }
+
+  .card-front::after {
+    content: '?';
+    font-size: clamp(18px, 5vw, 28px);
+    font-weight: bold;
+  }
+
+  .card-back {
+    background: linear-gradient(135deg, #e94560 0%, #c0392b 100%);
+    border: 2px solid rgba(255,100,100,0.4);
+    transform: rotateY(180deg);
+    font-size: clamp(24px, 7vw, 40px);
+  }
+
+  .card.matched .card-back {
+    background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%);
+    border-color: rgba(100,255,150,0.4);
+    animation: matchPop 0.3s ease forwards;
+  }
+
+  @keyframes matchPop {
+    0%   { transform: rotateY(180deg) scale(1); }
+    50%  { transform: rotateY(180deg) scale(1.12); }
+    100% { transform: rotateY(180deg) scale(1); }
+  }
+
+  .card:not(.flipped):not(.matched):active .card-inner {
+    transform: scale(0.93);
+  }
+
+  /* 완료 오버레이 */
+  #overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.3s ease;
+  }
+
+  #overlay.show {
+    display: flex;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .result-box {
+    background: #16213e;
+    border: 2px solid #e94560;
+    border-radius: 20px;
+    padding: 32px 40px;
+    text-align: center;
+    max-width: 320px;
+    width: 90%;
+    animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  .result-box h2 {
+    font-size: 36px;
+    color: #e94560;
+    margin-bottom: 8px;
+  }
+
+  .result-box .result-emoji {
+    font-size: 52px;
+    margin-bottom: 12px;
+  }
+
+  .result-stats {
+    font-size: 16px;
+    color: #ccc;
+    margin-bottom: 6px;
+  }
+
+  .result-stats span {
+    color: white;
+    font-weight: bold;
+  }
+
+  .play-again-btn {
+    margin-top: 20px;
+    background: #e94560;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 30px;
+    padding: 12px 36px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: transform 0.15s;
+  }
+
+  .play-again-btn:active { transform: scale(0.95); }
+</style>
+</head>
+<body>
+
+<h1>🧠 메모리 게임</h1>
+
+<div class="hud">
+  <div class="hud-box">
+    <div class="hud-label">시간</div>
+    <div class="hud-value" id="timer">0</div>
+  </div>
+  <div class="hud-box">
+    <div class="hud-label">시도</div>
+    <div class="hud-value" id="moves">0</div>
+  </div>
+  <div class="hud-box">
+    <div class="hud-label">매칭</div>
+    <div class="hud-value" id="matched">0</div>
+  </div>
+</div>
+
+<div class="difficulty">
+  <button class="diff-btn active" data-level="easy">쉬움 (4×3)</button>
+  <button class="diff-btn" data-level="medium">보통 (4×4)</button>
+  <button class="diff-btn" data-level="hard">어려움 (5×4)</button>
+</div>
+
+<div id="grid"></div>
+
+<div id="overlay">
+  <div class="result-box">
+    <div class="result-emoji">🎉</div>
+    <h2>완료!</h2>
+    <p class="result-stats">시간: <span id="res-time">-</span></p>
+    <p class="result-stats">시도 횟수: <span id="res-moves">-</span></p>
+    <p class="result-stats">등급: <span id="res-grade">-</span></p>
+    <button class="play-again-btn" id="play-again">다시 하기</button>
+  </div>
+</div>
+
+<script>
+const LEVELS = {
+  easy:   { cols: 4, rows: 3 },
+  medium: { cols: 4, rows: 4 },
+  hard:   { cols: 5, rows: 4 },
+};
+
+const EMOJI_POOL = [
+  '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼',
+  '🐨','🐯','🦁','🐸','🐙','🦋','🐬','🦄',
+  '🍎','🍊','🍋','🍇','🍓','🍒','🥝','🍉',
+  '⚽','🎸','🚀','🌈','🎯','💎','🔥','❄️',
+];
+
+let level = 'easy';
+let cards = [];
+let flipped = [];
+let matchedCount = 0;
+let moves = 0;
+let timerInterval = null;
+let seconds = 0;
+let locked = false;
+let totalPairs = 0;
+
+// 난이도 버튼
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    level = btn.dataset.level;
+    startGame();
+  });
+});
+
+document.getElementById('play-again').addEventListener('click', () => {
+  document.getElementById('overlay').classList.remove('show');
+  startGame();
+});
+
+function startGame() {
+  clearInterval(timerInterval);
+  seconds = 0;
+  moves = 0;
+  matchedCount = 0;
+  flipped = [];
+  locked = false;
+
+  updateHUD();
+
+  const { cols, rows } = LEVELS[level];
+  totalPairs = (cols * rows) / 2;
+
+  // 이모지 섞기
+  const pool = [...EMOJI_POOL].sort(() => Math.random() - 0.5).slice(0, totalPairs);
+  const deck = [...pool, ...pool].sort(() => Math.random() - 0.5);
+
+  // 그리드 렌더링
+  const grid = document.getElementById('grid');
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.innerHTML = '';
+
+  cards = deck.map((emoji, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-inner">
+        <div class="card-front"></div>
+        <div class="card-back">${emoji}</div>
+      </div>`;
+    card.dataset.emoji = emoji;
+    card.dataset.index = i;
+    card.addEventListener('click', () => onCardClick(card));
+    card.addEventListener('touchend', e => { e.preventDefault(); onCardClick(card); });
+    grid.appendChild(card);
+    return card;
+  });
+
+  // 타이머 시작
+  timerInterval = setInterval(() => {
+    seconds++;
+    document.getElementById('timer').textContent = formatTime(seconds);
+  }, 1000);
+}
+
+function onCardClick(card) {
+  if (locked) return;
+  if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+  card.classList.add('flipped');
+  flipped.push(card);
+
+  if (flipped.length === 2) {
+    locked = true;
+    moves++;
+    document.getElementById('moves').textContent = moves;
+    checkMatch();
+  }
+}
+
+function checkMatch() {
+  const [a, b] = flipped;
+  if (a.dataset.emoji === b.dataset.emoji) {
+    // 매칭 성공
+    setTimeout(() => {
+      a.classList.add('matched');
+      b.classList.add('matched');
+      flipped = [];
+      locked = false;
+      matchedCount++;
+      document.getElementById('matched').textContent = matchedCount;
+      if (matchedCount === totalPairs) gameComplete();
+    }, 300);
+  } else {
+    // 매칭 실패 - 다시 뒤집기
+    setTimeout(() => {
+      a.classList.remove('flipped');
+      b.classList.remove('flipped');
+      flipped = [];
+      locked = false;
+    }, 900);
+  }
+}
+
+function gameComplete() {
+  clearInterval(timerInterval);
+
+  // 등급 계산
+  const perfectMoves = totalPairs;
+  const ratio = perfectMoves / moves;
+  let grade, emoji;
+  if (ratio >= 0.9)      { grade = 'S'; emoji = '🏆'; }
+  else if (ratio >= 0.7) { grade = 'A'; emoji = '⭐'; }
+  else if (ratio >= 0.5) { grade = 'B'; emoji = '👍'; }
+  else                   { grade = 'C'; emoji = '🙂'; }
+
+  document.querySelector('.result-emoji').textContent = emoji;
+  document.getElementById('res-time').textContent = formatTime(seconds);
+  document.getElementById('res-moves').textContent = `${moves}번`;
+  document.getElementById('res-grade').textContent = grade;
+
+  setTimeout(() => {
+    document.getElementById('overlay').classList.add('show');
+  }, 400);
+}
+
+function updateHUD() {
+  document.getElementById('timer').textContent = formatTime(seconds);
+  document.getElementById('moves').textContent = moves;
+  document.getElementById('matched').textContent = matchedCount;
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m > 0 ? `${m}:${String(sec).padStart(2,'0')}` : `${sec}s`;
+}
+
+// 시작
+startGame();
+</script>
+</body>
+</html>

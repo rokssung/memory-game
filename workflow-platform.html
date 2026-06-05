@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowOS — 모듈형 워크플로우 플랫폼</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f14;
+      --surface: #161a24;
+      --surface2: #1e2333;
+      --border: #2a2f42;
+      --accent: #5b6af0;
+      --accent2: #7c3aed;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --cyan: #06b6d4;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --node-w: 180px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 20px; height: 52px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; z-index: 100;
+    }
+    .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; color: #fff; }
+    .logo span { color: var(--accent); }
+    .wf-name {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 5px 12px; border-radius: 6px;
+      font-size: 13px; outline: none; width: 200px;
+    }
+    .topbar-sep { flex: 1; }
+    .badge { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+    .badge-active { background: #14532d; color: var(--green); }
+    .badge-draft  { background: #1e1b4b; color: #a5b4fc; }
+    .btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 7px; font-size: 13px;
+      font-weight: 600; cursor: pointer; border: none; transition: all .15s;
+    }
+    .btn-ghost { background: transparent; color: var(--muted); }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #4a59e8; }
+    .btn-danger { background: #7f1d1d; color: #fca5a5; }
+    .btn-danger:hover { background: #991b1b; }
+
+    /* ── MAIN LAYOUT ── */
+    .workspace { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── LEFT PANEL ── */
+    .panel-left {
+      width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+    }
+    .panel-section { padding: 14px 16px 8px; }
+    .panel-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .search-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 7px 10px; border-radius: 7px;
+      font-size: 12px; outline: none;
+    }
+    .search-input::placeholder { color: var(--muted); }
+    .node-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 10px; border-radius: 7px; cursor: grab;
+      font-size: 12px; margin-bottom: 2px; transition: background .12s;
+      user-select: none;
+    }
+    .node-item:hover { background: var(--surface2); }
+    .node-item:active { cursor: grabbing; }
+    .node-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-trigger  { background: var(--yellow); }
+    .dot-action   { background: var(--accent); }
+    .dot-logic    { background: var(--cyan); }
+    .dot-ai       { background: #a78bfa; }
+    .dot-transform{ background: var(--green); }
+    .divider { height: 1px; background: var(--border); margin: 8px 16px; }
+
+    /* ── CANVAS ── */
+    .canvas-wrap {
+      flex: 1; position: relative; overflow: hidden;
+      background: var(--bg);
+      background-image:
+        radial-gradient(circle, #2a2f42 1px, transparent 1px);
+      background-size: 28px 28px;
+      cursor: grab;
+    }
+    .canvas-wrap.panning { cursor: grabbing; }
+    .canvas { position: absolute; top: 0; left: 0; width: 2400px; height: 1600px; }
+    svg.edges { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    .wf-node {
+      position: absolute; width: var(--node-w);
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; cursor: move; user-select: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .wf-node:hover   { box-shadow: 0 6px 28px rgba(0,0,0,.6); border-color: #3a4055; }
+    .wf-node.selected{ border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,106,240,.25); }
+    .wf-node.running { border-color: var(--yellow); animation: pulse-yellow 1.2s ease-in-out infinite; }
+    .wf-node.done    { border-color: var(--green); }
+    .wf-node.error   { border-color: var(--red); }
+
+    @keyframes pulse-yellow {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(245,158,11,.15); }
+      50%       { box-shadow: 0 0 0 6px rgba(245,158,11,.3); }
+    }
+
+    .node-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px 8px; border-bottom: 1px solid var(--border);
+    }
+    .node-icon {
+      width: 28px; height: 28px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .node-title { font-size: 12px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .node-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .status-idle    { background: var(--muted); }
+    .status-running { background: var(--yellow); }
+    .status-done    { background: var(--green); }
+    .status-error   { background: var(--red); }
+
+    .node-body { padding: 8px 12px 10px; font-size: 11px; color: var(--muted); }
+    .node-body span { color: #94a3b8; }
+
+    .node-port {
+      position: absolute; width: 12px; height: 12px; border-radius: 50%;
+      background: var(--surface2); border: 2px solid var(--border);
+      cursor: crosshair; transition: border-color .12s, transform .12s;
+    }
+    .node-port:hover { border-color: var(--accent); transform: scale(1.3); }
+    .port-in  { left: -7px; top: 50%; transform: translateY(-50%); }
+    .port-in:hover { transform: translateY(-50%) scale(1.3); }
+    .port-out { right: -7px; top: 50%; transform: translateY(-50%); }
+    .port-out:hover { transform: translateY(-50%) scale(1.3); }
+
+    /* ── RIGHT PANEL ── */
+    .panel-right {
+      width: 260px; background: var(--surface); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+    }
+    .panel-tabs {
+      display: flex; border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1; padding: 12px 0; text-align: center; font-size: 12px;
+      font-weight: 600; color: var(--muted); cursor: pointer;
+      border-bottom: 2px solid transparent; transition: all .15s;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .prop-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .prop-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin-bottom: 8px; }
+    .prop-field { margin-bottom: 10px; }
+    .prop-field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .prop-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 7px 10px; border-radius: 7px;
+      font-size: 12px; outline: none; transition: border-color .15s;
+    }
+    .prop-input:focus { border-color: var(--accent); }
+    .prop-select {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 7px 10px; border-radius: 7px;
+      font-size: 12px; outline: none; cursor: pointer;
+    }
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; color: var(--muted); margin-bottom: 8px;
+    }
+    .toggle {
+      width: 36px; height: 20px; background: var(--border); border-radius: 20px;
+      position: relative; cursor: pointer; transition: background .2s;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: ''; position: absolute; width: 14px; height: 14px;
+      background: #fff; border-radius: 50%; top: 3px; left: 3px;
+      transition: left .2s;
+    }
+    .toggle.on::after { left: 19px; }
+
+    /* ── LOG PANEL ── */
+    .log-panel {
+      height: 160px; background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .log-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 16px; height: 36px; border-bottom: 1px solid var(--border);
+    }
+    .log-title { font-size: 12px; font-weight: 600; }
+    .log-clear { margin-left: auto; font-size: 11px; color: var(--muted); cursor: pointer; }
+    .log-clear:hover { color: var(--text); }
+    .log-body { flex: 1; overflow-y: auto; padding: 8px 16px; font-family: 'Menlo', 'Consolas', monospace; font-size: 11px; }
+    .log-line { display: flex; gap: 10px; margin-bottom: 3px; }
+    .log-time { color: var(--muted); flex-shrink: 0; }
+    .log-lvl  { flex-shrink: 0; width: 42px; font-weight: 700; }
+    .lvl-info { color: var(--cyan); }
+    .lvl-ok   { color: var(--green); }
+    .lvl-warn { color: var(--yellow); }
+    .lvl-err  { color: var(--red); }
+    .log-msg  { color: #94a3b8; }
+
+    /* ── MINI-MAP ── */
+    .minimap {
+      position: absolute; bottom: 16px; right: 16px;
+      width: 140px; height: 90px;
+      background: rgba(22,26,36,.85); border: 1px solid var(--border);
+      border-radius: 8px; backdrop-filter: blur(6px);
+      overflow: hidden;
+    }
+    .minimap-label { position: absolute; top: 5px; left: 8px; font-size: 9px; color: var(--muted); }
+
+    /* ── TOOLBAR ── */
+    .canvas-toolbar {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 4px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 5px 8px;
+      backdrop-filter: blur(6px);
+    }
+    .tool-btn {
+      width: 32px; height: 32px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; cursor: pointer; color: var(--muted);
+      background: transparent; border: none; transition: all .12s;
+    }
+    .tool-btn:hover { background: var(--surface2); color: var(--text); }
+    .tool-btn.active { background: var(--accent); color: #fff; }
+
+    /* ── RUN OVERLAY ── */
+    .run-overlay {
+      position: absolute; top: 60px; right: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 16px; width: 200px;
+      font-size: 12px;
+    }
+    .run-title { font-weight: 700; margin-bottom: 10px; }
+    .run-row { display: flex; justify-content: space-between; margin-bottom: 6px; color: var(--muted); }
+    .run-row span:last-child { color: var(--text); font-weight: 600; }
+    .progress-bar { height: 4px; background: var(--border); border-radius: 4px; margin-top: 10px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--cyan)); border-radius: 4px; width: 0%; transition: width .3s; }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">Flow<span>OS</span></div>
+  <div style="width:1px;height:24px;background:var(--border)"></div>
+  <input class="wf-name" value="신규 유저 온보딩" />
+  <span class="badge badge-draft">Draft</span>
+  <div class="topbar-sep"></div>
+  <button class="btn btn-ghost" onclick="toggleRun()">▶ 테스트 실행</button>
+  <button class="btn btn-primary" onclick="saveDraft()">저장</button>
+  <button class="btn btn-danger" id="stopBtn" style="display:none" onclick="stopRun()">■ 중지</button>
+</div>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- LEFT PANEL -->
+  <div class="panel-left">
+    <div class="panel-section">
+      <div class="panel-label">노드 검색</div>
+      <input class="search-input" placeholder="노드 검색..." oninput="filterNodes(this.value)" />
+    </div>
+    <div class="panel-section" id="nodeList">
+      <div class="panel-label">트리거</div>
+      <div class="node-item" draggable="true" data-type="webhook" data-color="#f59e0b" data-icon="🔗" data-desc="POST /webhook">
+        <div class="node-dot dot-trigger"></div>Webhook 트리거
+      </div>
+      <div class="node-item" draggable="true" data-type="schedule" data-color="#f59e0b" data-icon="⏰" data-desc="매일 09:00">
+        <div class="node-dot dot-trigger"></div>스케줄 트리거
+      </div>
+      <div class="node-item" draggable="true" data-type="event" data-color="#f59e0b" data-icon="⚡" data-desc="이벤트 수신">
+        <div class="node-dot dot-trigger"></div>이벤트 트리거
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-label">액션</div>
+      <div class="node-item" draggable="true" data-type="email" data-color="#5b6af0" data-icon="✉️" data-desc="이메일 발송">
+        <div class="node-dot dot-action"></div>이메일 발송
+      </div>
+      <div class="node-item" draggable="true" data-type="slack" data-color="#5b6af0" data-icon="💬" data-desc="#채널 메시지">
+        <div class="node-dot dot-action"></div>Slack 알림
+      </div>
+      <div class="node-item" draggable="true" data-type="http" data-color="#5b6af0" data-icon="🌐" data-desc="HTTP 요청">
+        <div class="node-dot dot-action"></div>HTTP 요청
+      </div>
+      <div class="node-item" draggable="true" data-type="db" data-color="#5b6af0" data-icon="🗄️" data-desc="DB 쿼리">
+        <div class="node-dot dot-action"></div>DB 쿼리
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-label">로직</div>
+      <div class="node-item" draggable="true" data-type="if" data-color="#06b6d4" data-icon="🔀" data-desc="조건 분기">
+        <div class="node-dot dot-logic"></div>조건 분기 (IF)
+      </div>
+      <div class="node-item" draggable="true" data-type="loop" data-color="#06b6d4" data-icon="🔁" data-desc="반복 실행">
+        <div class="node-dot dot-logic"></div>루프
+      </div>
+      <div class="node-item" draggable="true" data-type="wait" data-color="#06b6d4" data-icon="⏳" data-desc="대기">
+        <div class="node-dot dot-logic"></div>대기
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-label">AI</div>
+      <div class="node-item" draggable="true" data-type="llm" data-color="#a78bfa" data-icon="🤖" data-desc="Claude / GPT">
+        <div class="node-dot dot-ai"></div>LLM 호출
+      </div>
+      <div class="node-item" draggable="true" data-type="classify" data-color="#a78bfa" data-icon="🏷️" data-desc="텍스트 분류">
+        <div class="node-dot dot-ai"></div>분류기
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-label">변환</div>
+      <div class="node-item" draggable="true" data-type="json" data-color="#22c55e" data-icon="{ }" data-desc="JSON 가공">
+        <div class="node-dot dot-transform"></div>JSON 변환
+      </div>
+      <div class="node-item" draggable="true" data-type="code" data-color="#22c55e" data-icon="</>" data-desc="JS 코드 실행">
+        <div class="node-dot dot-transform"></div>코드 실행
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap" id="canvasWrap"
+    ondragover="event.preventDefault()"
+    ondrop="onDrop(event)"
+    onmousedown="onCanvasMouseDown(event)"
+    onmousemove="onCanvasMouseMove(event)"
+    onmouseup="onCanvasMouseUp(event)">
+
+    <!-- Pan group -->
+    <div id="panGroup" style="position:absolute;top:0;left:0;width:2400px;height:1600px;transform-origin:0 0">
+      <svg class="edges" id="edgeSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></svg>
+      <div class="canvas" id="canvas" style="position:absolute;top:0;left:0;width:100%;height:100%"></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="canvas-toolbar">
+      <button class="tool-btn active" id="toolSelect" title="선택" onclick="setTool('select')">↖</button>
+      <button class="tool-btn" id="toolConnect" title="연결" onclick="setTool('connect')">⟶</button>
+      <button class="tool-btn" title="맞춤" onclick="fitView()">⊞</button>
+      <div style="width:1px;height:24px;background:var(--border);margin:4px 2px"></div>
+      <button class="tool-btn" title="삭제" onclick="deleteSelected()">🗑</button>
+    </div>
+
+    <!-- Run overlay -->
+    <div class="run-overlay" id="runOverlay" style="display:none">
+      <div class="run-title">⚡ 실행 중...</div>
+      <div class="run-row"><span>실행 ID</span><span id="runId">—</span></div>
+      <div class="run-row"><span>완료 노드</span><span id="runDone">0 / 0</span></div>
+      <div class="run-row"><span>경과 시간</span><span id="runTime">0s</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <!-- Minimap -->
+    <div class="minimap">
+      <div class="minimap-label">MINIMAP</div>
+      <canvas id="minimapCanvas" width="140" height="90" style="opacity:.6"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel-right">
+    <div class="panel-tabs">
+      <div class="tab active" onclick="switchTab(this,'props')">속성</div>
+      <div class="tab" onclick="switchTab(this,'vars')">변수</div>
+      <div class="tab" onclick="switchTab(this,'history')">기록</div>
+    </div>
+
+    <!-- Props tab -->
+    <div id="tab-props">
+      <div class="prop-section" id="propEmpty" style="padding:40px 16px;text-align:center;color:var(--muted);font-size:12px">
+        노드를 선택하면<br>속성이 표시됩니다.
+      </div>
+      <div id="propDetail" style="display:none">
+        <div class="prop-section">
+          <div class="prop-label">노드 정보</div>
+          <div class="prop-field">
+            <label>이름</label>
+            <input class="prop-input" id="propName" oninput="updateNodeName(this.value)" />
+          </div>
+          <div class="prop-field">
+            <label>설명</label>
+            <input class="prop-input" id="propDesc" placeholder="짧은 설명..." />
+          </div>
+        </div>
+        <div class="prop-section">
+          <div class="prop-label">설정</div>
+          <div id="propDynamic"></div>
+          <div class="toggle-row">
+            <span>에러 무시</span>
+            <div class="toggle" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="toggle-row">
+            <span>재시도 활성화</span>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+        <div class="prop-section">
+          <div class="prop-label">재시도 정책</div>
+          <div class="prop-field">
+            <label>최대 횟수</label>
+            <select class="prop-select">
+              <option>1회</option><option selected>3회</option><option>5회</option><option>무제한</option>
+            </select>
+          </div>
+          <div class="prop-field">
+            <label>백오프</label>
+            <select class="prop-select">
+              <option>즉시</option><option selected>지수적</option><option>고정</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vars tab -->
+    <div id="tab-vars" style="display:none">
+      <div class="prop-section">
+        <div class="prop-label">워크플로우 변수</div>
+        <div id="varList" style="font-size:12px"></div>
+        <button class="btn btn-ghost" style="width:100%;margin-top:8px;justify-content:center;font-size:12px" onclick="addVar()">+ 변수 추가</button>
+      </div>
+    </div>
+
+    <!-- History tab -->
+    <div id="tab-history" style="display:none">
+      <div class="prop-section">
+        <div class="prop-label">최근 실행</div>
+        <div id="historyList" style="font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOG PANEL -->
+<div class="log-panel">
+  <div class="log-header">
+    <span style="font-size:11px;color:var(--muted)">●</span>
+    <span class="log-title">실행 로그</span>
+    <div style="display:flex;gap:6px;margin-left:8px">
+      <span class="badge" style="background:#0c2a3a;color:var(--cyan);cursor:pointer" onclick="filterLog('all')">ALL</span>
+      <span class="badge" style="background:#14532d;color:var(--green);cursor:pointer" onclick="filterLog('ok')">OK</span>
+      <span class="badge" style="background:#431407;color:var(--yellow);cursor:pointer" onclick="filterLog('warn')">WARN</span>
+      <span class="badge" style="background:#450a0a;color:var(--red);cursor:pointer" onclick="filterLog('err')">ERR</span>
+    </div>
+    <span class="log-clear" onclick="clearLog()">지우기</span>
+  </div>
+  <div class="log-body" id="logBody"></div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+const state = {
+  nodes: [],
+  edges: [],
+  selected: null,
+  tool: 'select',
+  drag: null,
+  connecting: null,
+  pan: null,       // { startX, startY, ox, oy }
+  panOffset: { x: 0, y: 0 },
+  nextId: 1,
+  running: false,
+  vars: [
+    { key: 'USER_EMAIL', val: '{{ trigger.email }}' },
+    { key: 'SLACK_CHANNEL', val: '#onboarding' },
+  ],
+  history: []
+}
+
+// ─── DEFAULT WORKFLOW ─────────────────────────────────────
+const defaults = [
+  { type:'webhook', x:60,  y:30,  title:'Webhook 트리거', desc:'POST /users/created', color:'#f59e0b', icon:'🔗' },
+  { type:'email',   x:60,  y:145, title:'환영 이메일',   desc:'template: welcome-v2', color:'#5b6af0', icon:'✉️' },
+  { type:'slack',   x:60,  y:260, title:'Slack 알림',    desc:'#signups 채널',        color:'#5b6af0', icon:'💬' },
+  { type:'wait',    x:60,  y:375, title:'3일 대기',      desc:'duration: 3d',         color:'#06b6d4', icon:'⏳' },
+  { type:'email',   x:60,  y:490, title:'팔로업 이메일', desc:'template: followup-v1',color:'#5b6af0', icon:'✉️' },
+]
+const defaultEdges = [[0,1],[1,2],[1,3],[3,4]]
+
+defaults.forEach(n => addNode(n.type, n.x, n.y, n.title, n.desc, n.color, n.icon))
+defaultEdges.forEach(([a,b]) => state.edges.push({ from: state.nodes[a].id, to: state.nodes[b].id }))
+renderAll()
+addLog('info', '워크플로우가 로드되었습니다.')
+addLog('ok',   'FlowOS Studio v1.0 준비 완료')
+setTimeout(fitView, 50)
+renderVars()
+renderHistory()
+
+// ─── NODE CREATION ────────────────────────────────────────
+function addNode(type, x, y, title, desc, color, icon) {
+  const id = 'n' + (state.nextId++)
+  state.nodes.push({ id, type, x, y, title: title||type, desc: desc||'', color: color||'#5b6af0', icon: icon||'⚙️', status:'idle' })
+  return id
+}
+
+function renderAll() {
+  renderNodes()
+  renderEdges()
+  renderMinimap()
+}
+
+// ─── RENDER NODES ─────────────────────────────────────────
+function renderNodes() {
+  const canvas = document.getElementById('canvas')
+  // remove deleted
+  Array.from(canvas.querySelectorAll('.wf-node')).forEach(el => {
+    if (!state.nodes.find(n => n.id === el.dataset.id)) el.remove()
+  })
+  state.nodes.forEach(n => {
+    let el = canvas.querySelector(`[data-id="${n.id}"]`)
+    if (!el) {
+      el = document.createElement('div')
+      el.className = 'wf-node'
+      el.dataset.id = n.id
+      el.innerHTML = `
+        <div class="node-port port-in" data-node="${n.id}" data-dir="in"></div>
+        <div class="node-header">
+          <div class="node-icon" style="background:${n.color}22">${n.icon}</div>
+          <div class="node-title">${n.title}</div>
+          <div class="node-status-dot status-idle" id="sd-${n.id}"></div>
+        </div>
+        <div class="node-body">${n.desc ? '<span>'+n.desc+'</span>' : '&nbsp;'}</div>
+        <div class="node-port port-out" data-node="${n.id}" data-dir="out"></div>
+      `
+      el.addEventListener('mousedown', e => onNodeMouseDown(e, n.id))
+      el.querySelectorAll('.node-port').forEach(p => p.addEventListener('mousedown', e => onPortMouseDown(e, n.id, p.dataset.dir)))
+      canvas.appendChild(el)
+    }
+    el.style.left = n.x + 'px'
+    el.style.top  = n.y + 'px'
+    el.className = 'wf-node' + (state.selected===n.id?' selected':'') + (n.status==='running'?' running':'') + (n.status==='done'?' done':'') + (n.status==='error'?' error':'')
+    const sd = document.getElementById('sd-'+n.id)
+    if (sd) sd.className = `node-status-dot status-${n.status}`
+  })
+}
+
+// ─── RENDER EDGES ─────────────────────────────────────────
+function renderEdges(tempEdge) {
+  const svg = document.getElementById('edgeSvg')
+  svg.innerHTML = ''
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs')
+  defs.innerHTML = `<marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#3a4055"/>
+  </marker>
+  <marker id="arrow-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#5b6af0"/>
+  </marker>`
+  svg.appendChild(defs)
+  state.edges.forEach(e => {
+    const from = state.nodes.find(n=>n.id===e.from)
+    const to   = state.nodes.find(n=>n.id===e.to)
+    if (!from||!to) return
+    const active = from.status==='done'||from.status==='running'
+    drawEdge(svg, from.x+180, from.y+44, to.x, to.y+44, active)
+  })
+  if (tempEdge) {
+    const from = state.nodes.find(n=>n.id===state.connecting.fromId)
+    if (from) drawEdge(svg, from.x+180, from.y+44, tempEdge.x, tempEdge.y, false, true)
+  }
+}
+
+function drawEdge(svg, x1, y1, x2, y2, active, temp) {
+  const cx = (x1+x2)/2
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path')
+  path.setAttribute('d', `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`)
+  path.setAttribute('fill','none')
+  path.setAttribute('stroke', temp ? '#5b6af0' : active ? '#5b6af0' : '#3a4055')
+  path.setAttribute('stroke-width', active ? '2' : '1.5')
+  path.setAttribute('stroke-dasharray', temp ? '6,4' : 'none')
+  path.setAttribute('marker-end', active ? 'url(#arrow-active)' : 'url(#arrow)')
+  path.setAttribute('opacity', temp ? '0.7' : '1')
+  svg.appendChild(path)
+}
+
+// ─── DRAG NODES ───────────────────────────────────────────
+function onNodeMouseDown(e, id) {
+  if (state.tool === 'connect') return
+  e.stopPropagation()
+  state.selected = id
+  const n = state.nodes.find(x=>x.id===id)
+  state.drag = { nodeId: id, ox: e.clientX - n.x, oy: e.clientY - n.y }
+  renderNodes()
+  showProps(id)
+}
+
+function onPortMouseDown(e, id, dir) {
+  e.stopPropagation()
+  if (dir === 'out') {
+    state.connecting = { fromId: id }
+    state.tool = 'connect'
+    document.getElementById('toolConnect').classList.add('active')
+    document.getElementById('toolSelect').classList.remove('active')
+  }
+}
+
+function onCanvasMouseDown(e) {
+  if (e.target.id === 'canvasWrap' || e.target.id === 'canvas' || e.target.id === 'panGroup') {
+    state.selected = null
+    renderNodes()
+    hideProps()
+    state.pan = { startX: e.clientX, startY: e.clientY, ox: state.panOffset.x, oy: state.panOffset.y }
+    document.getElementById('canvasWrap').classList.add('panning')
+  }
+}
+
+function onCanvasMouseMove(e) {
+  if (state.drag) {
+    const n = state.nodes.find(x=>x.id===state.drag.nodeId)
+    n.x = e.clientX - state.drag.ox
+    n.y = e.clientY - state.drag.oy
+    renderAll()
+  } else if (state.pan) {
+    state.panOffset.x = state.pan.ox + (e.clientX - state.pan.startX)
+    state.panOffset.y = state.pan.oy + (e.clientY - state.pan.startY)
+    applyPan()
+  }
+  if (state.connecting) {
+    const wrap = document.getElementById('canvasWrap').getBoundingClientRect()
+    renderEdges({ x: e.clientX - wrap.left - state.panOffset.x, y: e.clientY - wrap.top - state.panOffset.y })
+  }
+}
+
+function applyPan() {
+  document.getElementById('panGroup').style.transform = `translate(${state.panOffset.x}px,${state.panOffset.y}px)`
+}
+
+function onCanvasMouseUp(e) {
+  if (state.pan) { state.pan = null; document.getElementById('canvasWrap').classList.remove('panning') }
+  if (state.drag) { state.drag = null; renderMinimap() }
+  if (state.connecting) {
+    const target = e.target.closest('.node-port[data-dir="in"]')
+    if (target) {
+      const toId = target.dataset.node
+      const fromId = state.connecting.fromId
+      if (fromId !== toId && !state.edges.find(ed=>ed.from===fromId&&ed.to===toId)) {
+        state.edges.push({ from: fromId, to: toId })
+        addLog('info', `연결: ${state.nodes.find(n=>n.id===fromId)?.title} → ${state.nodes.find(n=>n.id===toId)?.title}`)
+      }
+    }
+    state.connecting = null
+    setTool('select')
+    renderEdges()
+  }
+}
+
+// ─── DROP FROM PANEL ──────────────────────────────────────
+function onDrop(e) {
+  const item = e.target.closest('.node-item')
+  if (!item) return
+  const wrap = document.getElementById('canvasWrap').getBoundingClientRect()
+  const type = item.dataset.type
+  const id = addNode(type, e.clientX - wrap.left - 90 - state.panOffset.x, e.clientY - wrap.top - 40 - state.panOffset.y,
+    item.textContent.trim(), item.dataset.desc, item.dataset.color, item.dataset.icon)
+  addLog('info', `노드 추가: ${state.nodes.find(n=>n.id===id)?.title}`)
+  renderAll()
+}
+
+// ─── TOOLS ────────────────────────────────────────────────
+function setTool(t) {
+  state.tool = t
+  document.getElementById('toolSelect').classList.toggle('active', t==='select')
+  document.getElementById('toolConnect').classList.toggle('active', t==='connect')
+}
+
+function deleteSelected() {
+  if (!state.selected) return
+  const n = state.nodes.find(x=>x.id===state.selected)
+  addLog('warn', `노드 삭제: ${n?.title}`)
+  state.nodes = state.nodes.filter(x=>x.id!==state.selected)
+  state.edges = state.edges.filter(e=>e.from!==state.selected&&e.to!==state.selected)
+  state.selected = null
+  hideProps()
+  renderAll()
+}
+
+function fitView() {
+  if (!state.nodes.length) return
+  const wrap = document.getElementById('canvasWrap')
+  const minX = Math.min(...state.nodes.map(n=>n.x))
+  const minY = Math.min(...state.nodes.map(n=>n.y))
+  state.panOffset.x = 40 - minX
+  state.panOffset.y = 40 - minY
+  applyPan()
+  addLog('info', '뷰 맞춤 완료')
+}
+
+// ─── PROPS ────────────────────────────────────────────────
+function showProps(id) {
+  const n = state.nodes.find(x=>x.id===id)
+  if (!n) return
+  document.getElementById('propEmpty').style.display = 'none'
+  document.getElementById('propDetail').style.display = 'block'
+  document.getElementById('propName').value = n.title
+  document.getElementById('propDesc').value = n.desc
+  const dyn = document.getElementById('propDynamic')
+  const configs = {
+    email:   [['수신자', '{{ trigger.email }}'], ['템플릿', 'welcome-v2']],
+    slack:   [['채널', '#onboarding'], ['메시지', '신규 유저: {{ name }}']],
+    http:    [['URL', 'https://api.example.com'], ['메서드', 'POST']],
+    wait:    [['대기 시간', '3d']],
+    if:      [['조건식', '{{ status }} === "active"']],
+    webhook: [['경로', '/users/created'], ['메서드', 'POST']],
+    schedule:[['크론 표현식', '0 9 * * *']],
+    llm:     [['모델', 'claude-sonnet-4-6'], ['프롬프트', '...']],
+    default: []
+  }
+  const fields = configs[n.type] || configs.default
+  dyn.innerHTML = fields.map(([label,val]) => `
+    <div class="prop-field">
+      <label>${label}</label>
+      <input class="prop-input" value="${val}" />
+    </div>
+  `).join('')
+}
+function hideProps() {
+  document.getElementById('propEmpty').style.display = 'block'
+  document.getElementById('propDetail').style.display = 'none'
+}
+function updateNodeName(val) {
+  if (!state.selected) return
+  const n = state.nodes.find(x=>x.id===state.selected)
+  if (n) { n.title = val; renderNodes() }
+}
+
+// ─── TABS ─────────────────────────────────────────────────
+function switchTab(el, name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'))
+  el.classList.add('active')
+  ;['props','vars','history'].forEach(t => {
+    const el = document.getElementById('tab-'+t)
+    if (el) el.style.display = t===name?'block':'none'
+  })
+}
+
+// ─── VARS ─────────────────────────────────────────────────
+function renderVars() {
+  const list = document.getElementById('varList')
+  list.innerHTML = state.vars.map((v,i) => `
+    <div style="margin-bottom:8px">
+      <div style="color:var(--cyan);margin-bottom:2px">${v.key}</div>
+      <input class="prop-input" value="${v.val}" oninput="state.vars[${i}].val=this.value" />
+    </div>
+  `).join('')
+}
+function addVar() {
+  state.vars.push({ key: 'NEW_VAR', val: '' })
+  renderVars()
+}
+
+// ─── HISTORY ─────────────────────────────────────────────
+function renderHistory() {
+  const list = document.getElementById('historyList')
+  if (!state.history.length) {
+    list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px 0">실행 기록 없음</div>'
+    return
+  }
+  list.innerHTML = state.history.map(h => `
+    <div style="margin-bottom:10px;padding:8px;background:var(--surface2);border-radius:7px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="color:var(--cyan);font-family:monospace">${h.id}</span>
+        <span class="badge badge-${h.ok?'active':'draft'}">${h.ok?'성공':'실패'}</span>
+      </div>
+      <div style="color:var(--muted)">${h.time} · ${h.duration}</div>
+    </div>
+  `).join('')
+}
+
+// ─── LOG ──────────────────────────────────────────────────
+function addLog(lvl, msg) {
+  const body = document.getElementById('logBody')
+  const now = new Date()
+  const ts = now.toTimeString().slice(0,8)
+  const lblMap = { info:'INFO', ok:'OK  ', warn:'WARN', err:'ERR ' }
+  const div = document.createElement('div')
+  div.className = 'log-line'
+  div.dataset.lvl = lvl
+  div.innerHTML = `<span class="log-time">${ts}</span><span class="log-lvl lvl-${lvl}">${lblMap[lvl]||lvl}</span><span class="log-msg">${msg}</span>`
+  body.appendChild(div)
+  body.scrollTop = body.scrollHeight
+}
+function clearLog() { document.getElementById('logBody').innerHTML = '' }
+function filterLog(lvl) {
+  document.querySelectorAll('.log-line').forEach(el => {
+    el.style.display = (lvl==='all'||el.dataset.lvl===lvl) ? '' : 'none'
+  })
+}
+
+// ─── SEARCH ───────────────────────────────────────────────
+function filterNodes(q) {
+  document.querySelectorAll('.node-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none'
+  })
+}
+
+// ─── RUN SIMULATION ───────────────────────────────────────
+let runTimer = null, runStart = null, runStep = 0
+
+function toggleRun() {
+  if (state.running) { stopRun(); return }
+  state.running = true
+  document.getElementById('stopBtn').style.display = 'flex'
+  document.getElementById('runOverlay').style.display = 'block'
+  const runId = 'run-' + Math.random().toString(36).slice(2,7)
+  document.getElementById('runId').textContent = runId
+  document.getElementById('runDone').textContent = '0 / ' + state.nodes.length
+  runStart = Date.now()
+  runStep = 0
+  state.nodes.forEach(n => n.status = 'idle')
+  addLog('info', `실행 시작: ${runId}`)
+
+  const order = topoSort()
+  simulateStep(order, runId)
+
+  runTimer = setInterval(() => {
+    const elapsed = ((Date.now() - runStart) / 1000).toFixed(1)
+    document.getElementById('runTime').textContent = elapsed + 's'
+  }, 200)
+}
+
+function topoSort() {
+  const visited = new Set(), order = []
+  const visit = id => {
+    if (visited.has(id)) return
+    visited.add(id)
+    state.edges.filter(e=>e.to===id).forEach(e=>visit(e.from))
+    order.push(id)
+  }
+  state.nodes.forEach(n=>visit(n.id))
+  return order
+}
+
+function simulateStep(order, runId) {
+  if (runStep >= order.length || !state.running) { finishRun(runId); return }
+  const id = order[runStep]
+  const n = state.nodes.find(x=>x.id===id)
+  if (!n) { runStep++; simulateStep(order, runId); return }
+  n.status = 'running'
+  renderAll()
+  addLog('info', `실행 중: ${n.title}`)
+  const delay = 600 + Math.random() * 900
+  setTimeout(() => {
+    if (!state.running) return
+    n.status = Math.random() > 0.1 ? 'done' : 'error'
+    if (n.status==='done') addLog('ok',   `완료: ${n.title}`)
+    else                   addLog('err',  `오류: ${n.title} — 재시도 중...`)
+    runStep++
+    const done = state.nodes.filter(x=>x.status==='done'||x.status==='error').length
+    document.getElementById('runDone').textContent = `${done} / ${state.nodes.length}`
+    document.getElementById('progressFill').style.width = (done/state.nodes.length*100)+'%'
+    renderAll()
+    setTimeout(() => simulateStep(order, runId), 200)
+  }, delay)
+}
+
+function finishRun(runId) {
+  clearInterval(runTimer)
+  state.running = false
+  document.getElementById('stopBtn').style.display = 'none'
+  document.getElementById('runOverlay').style.display = 'none'
+  const ok = state.nodes.every(n=>n.status==='done')
+  const dur = ((Date.now()-runStart)/1000).toFixed(1) + 's'
+  addLog(ok?'ok':'warn', `실행 완료: ${runId} (${dur}) ${ok?'✓ 성공':'⚠ 일부 오류'}`)
+  state.history.unshift({ id: runId, ok, time: new Date().toLocaleTimeString(), duration: dur })
+  renderHistory()
+}
+
+function stopRun() {
+  state.running = false
+  clearInterval(runTimer)
+  state.nodes.forEach(n => { if (n.status==='running') n.status='idle' })
+  document.getElementById('stopBtn').style.display = 'none'
+  document.getElementById('runOverlay').style.display = 'none'
+  addLog('warn', '실행이 중지되었습니다.')
+  renderAll()
+}
+
+// ─── SAVE ─────────────────────────────────────────────────
+function saveDraft() {
+  document.querySelector('.badge').className = 'badge badge-active'
+  document.querySelector('.badge').textContent = 'Active'
+  addLog('ok', '워크플로우가 저장되었습니다.')
+}
+
+// ─── MINIMAP ──────────────────────────────────────────────
+function renderMinimap() {
+  const c = document.getElementById('minimapCanvas')
+  const ctx = c.getContext('2d')
+  ctx.clearRect(0,0,140,90)
+  const scaleX = 140 / 1000, scaleY = 90 / 600
+  state.edges.forEach(e => {
+    const f = state.nodes.find(n=>n.id===e.from)
+    const t = state.nodes.find(n=>n.id===e.to)
+    if (!f||!t) return
+    ctx.beginPath()
+    ctx.moveTo(f.x*scaleX+9, f.y*scaleY+5)
+    ctx.lineTo(t.x*scaleX, t.y*scaleY+5)
+    ctx.strokeStyle='#3a4055'; ctx.lineWidth=1; ctx.stroke()
+  })
+  state.nodes.forEach(n => {
+    const clr = n.status==='done'?'#22c55e':n.status==='running'?'#f59e0b':n.status==='error'?'#ef4444':'#3a4055'
+    ctx.fillStyle = clr
+    ctx.fillRect(n.x*scaleX, n.y*scaleY, 18, 10)
+  })
+}
+</script>
+</body>
+</html>

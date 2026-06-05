@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Process Designer</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/json-logic-js@2.0.5/logic.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',sans-serif;overflow:hidden;}
+.canvas-grid{background-color:#F1F5F9;background-image:linear-gradient(rgba(148,163,184,.2)1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.2)1px,transparent 1px);background-size:24px 24px;}
+.port-out{position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:white;border:2.5px solid currentColor;cursor:crosshair;z-index:20;transition:transform .12s,box-shadow .12s;}
+.port-out:hover{transform:translateY(-50%) scale(1.35);box-shadow:0 0 0 4px rgba(99,102,241,.25);}
+.port-in{position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:white;border:2.5px solid #CBD5E1;pointer-events:none;z-index:20;transition:border-color .12s,background .12s;}
+.port-in.drop-target{border-color:#6366F1;background:#EEF2FF;}
+.node-wrap{position:absolute;user-select:none;}
+.is-connecting{cursor:crosshair!important;}.is-connecting .node-wrap{cursor:crosshair!important;}
+.is-moving .node-wrap{cursor:grabbing!important;}
+@keyframes dash{to{stroke-dashoffset:-20;}}
+.anim-dash{animation:dash .5s linear infinite;}
+.canvas-scroll::-webkit-scrollbar{width:6px;height:6px;}
+.canvas-scroll::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px;}
+.pp-input{width:100%;padding:7px 10px;font-size:12px;border:1.5px solid #E2E8F0;border-radius:7px;font-family:inherit;outline:none;background:white;transition:border-color .12s;}
+.pp-input:focus{border-color:#6366F1;}
+.badge-start{position:absolute;top:-9px;left:10px;font-size:9px;font-weight:800;color:#4F46E5;background:#EEF2FF;border:1.5px solid #6366F1;border-radius:4px;padding:1px 5px;pointer-events:none;}
+.badge-end{position:absolute;top:-9px;right:10px;font-size:9px;font-weight:800;color:#059669;background:#D1FAE5;border:1.5px solid #059669;border-radius:4px;padding:1px 5px;pointer-events:none;}
+.field-row{border:1.5px solid #E2E8F0;border-radius:8px;margin-bottom:6px;overflow:hidden;}
+.field-row-hd{display:flex;align-items:center;gap:5px;padding:7px 10px;background:#F8FAFC;cursor:pointer;user-select:none;}
+.field-row-bd{padding:10px;border-top:1px solid #E2E8F0;}
+.var-chip{font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;background:#EEF2FF;border:1.5px solid #818CF8;color:#4F46E5;cursor:pointer;transition:.1s;}
+.var-chip:hover{background:#818CF8;color:white;}
+/* Run overlay */
+.run-overlay{position:fixed;inset:0;background:rgba(15,23,42,.65);z-index:1000;display:flex;align-items:center;justify-content:center;}
+.run-modal{background:#fff;border-radius:18px;width:760px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.35);}
+/* Run module */
+.run-form-input{width:100%;padding:9px 12px;font-size:13px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:inherit;outline:none;transition:border-color .15s;}
+.run-form-input:focus{border-color:#6366F1;}
+/* Toast */
+@keyframes slideUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.run-toast{animation:slideUp .2s ease-out;}
+</style>
+</head>
+<body><div id="root"></div>
+
+<script>
+/* ── 샘플 프로세스 (localStorage 없을 때 기본 탑재) ── */
+const SAMPLE_PROCESSES = [{"id":"proc-mpy5ui12-1","name":"과제관리","icon":"📋","description":"과제 등록부터 완료까지","version":"1.0.0","initialState":"state-mpy5ui3w-2","states":[{"id":"state-mpy5ui3w-2","label":"과제 등록","terminal":false,"module":{"type":"form","config":{"title":"과제 등록","submitLabel":"검토 요청","fields":[{"key":"title","label":"과제 제목","type":"string","required":true,"placeholder":"과제 제목"},{"key":"assignee","label":"담당자","type":"string","required":true,"placeholder":"홍길동"},{"key":"priority","label":"우선순위","type":"select","required":true,"options":["높음","중간","낮음"]}]}}},{"id":"state-mpy5ui3w-3","label":"팀장 검토","terminal":false,"module":{"type":"approval","config":{"title":"팀장 검토","description":"과제 내용을 확인하고 승인/반려해 주세요.","approveLabel":"승인","rejectLabel":"반려","resultKey":"approved","commentKey":"comment"}}},{"id":"state-mpy5ui3w-4","label":"진행","terminal":false,"module":{"type":"form","config":{"title":"진행 상황","submitLabel":"완료","fields":[{"key":"progress","label":"진행 내용","type":"text","required":true,"placeholder":"진행 상황을 입력하세요"}]}}},{"id":"state-mpy5ui3w-5","label":"완료 현황판","terminal":true,"module":{"type":"dashboard","config":{"title":"과제 현황판","cardTitleKey":"title","cardSubtitleKey":"assignee","columns":[{"value":"state-mpy5ui3w-2","label":"📝 등록"},{"value":"state-mpy5ui3w-3","label":"🔍 검토중"},{"value":"state-mpy5ui3w-4","label":"⚙️ 진행중"},{"value":"state-mpy5ui3w-5","label":"✅ 완료"}]}}}],"transitions":[{"id":"trans-mpy5ui84-6","from":"state-mpy5ui3w-2","to":"state-mpy5ui3w-3","label":"검토 요청","trigger":"manual","condition":null},{"id":"trans-mpy5ui85-7","from":"state-mpy5ui3w-3","to":"state-mpy5ui3w-4","label":"승인","trigger":"manual","condition":{"==":[{"var":"approved"},true]}},{"id":"trans-mpy5ui85-8","from":"state-mpy5ui3w-4","to":"state-mpy5ui3w-5","label":"완료","trigger":"manual","condition":null},{"id":"trans-mpy5ui85-9","from":"state-mpy5ui3w-3","to":"state-mpy5ui3w-2","label":"반려","trigger":"manual","condition":{"==":[{"var":"approved"},false]}}],"_layout":{"state-mpy5ui3w-2":{"x":80,"y":80},"state-mpy5ui3w-3":{"x":342,"y":80},"state-mpy5ui3w-4":{"x":604,"y":80},"state-mpy5ui3w-5":{"x":866,"y":80}}},{"id":"proc-mpy69vn3-1","name":"휴가 신청","icon":"🏖️","description":"직원 휴가 신청부터 승인까지","version":"1.0.0","initialState":"state-mpy69vpx-2","states":[{"id":"state-mpy69vpx-2","label":"신청서 작성","terminal":false,"module":{"type":"form","config":{"title":"휴가 신청서","submitLabel":"신청하기","fields":[{"key":"applicant","label":"신청자","type":"string","required":true,"placeholder":"홍길동"},{"key":"vacation_type","label":"휴가 종류","type":"select","required":true,"options":["연차","반차(오전)","반차(오후)","병가","경조사"]},{"key":"start_date","label":"시작일","type":"date","required":true},{"key":"end_date","label":"종료일","type":"date","required":true},{"key":"reason","label":"사유","type":"text","required":false,"placeholder":"간단히 입력하세요 (선택)"}]}}},{"id":"state-mpy69vpx-3","label":"팀장 승인","terminal":false,"module":{"type":"approval","config":{"title":"팀장 승인 요청","description":"신청 내용을 확인하고 승인 또는 반려해 주세요.","approveLabel":"승인","rejectLabel":"반려","resultKey":"manager_approved","commentKey":"manager_comment"}}},{"id":"state-mpy69vpx-4","label":"인사팀 확인","terminal":false,"module":{"type":"approval","config":{"title":"인사팀 최종 확인","description":"연차 잔여일수를 확인하고 최종 승인해 주세요.","approveLabel":"확인 완료","rejectLabel":"반려","resultKey":"hr_approved","commentKey":"hr_comment"}}},{"id":"state-mpy69vpx-5","label":"결과 통보","terminal":true,"module":{"type":"notification","config":{"title":"처리 완료","messageTemplate":"{{applicant}}님의 {{vacation_type}} 신청이 승인되었습니다.\n기간: {{start_date}} ~ {{end_date}}\n팀장 코멘트: {{manager_comment}}","autoAdvance":false}}}],"transitions":[{"id":"trans-mpy69vu5-6","from":"state-mpy69vpx-2","to":"state-mpy69vpx-3","label":"신청하기","trigger":"manual","condition":null},{"id":"trans-mpy69vu5-7","from":"state-mpy69vpx-3","to":"state-mpy69vpx-4","label":"승인","trigger":"manual","condition":{"==":[{"var":"manager_approved"},true]}},{"id":"trans-mpy69vu5-8","from":"state-mpy69vpx-3","to":"state-mpy69vpx-2","label":"반려","trigger":"manual","condition":{"==":[{"var":"manager_approved"},false]}},{"id":"trans-mpy69vu5-9","from":"state-mpy69vpx-4","to":"state-mpy69vpx-5","label":"확인 완료","trigger":"manual","condition":{"==":[{"var":"hr_approved"},true]}},{"id":"trans-mpy69vu5-a","from":"state-mpy69vpx-4","to":"state-mpy69vpx-2","label":"반려","trigger":"manual","condition":{"==":[{"var":"hr_approved"},false]}}],"_layout":{"state-mpy69vpx-2":{"x":80,"y":80},"state-mpy69vpx-3":{"x":342,"y":80},"state-mpy69vpx-4":{"x":604,"y":80},"state-mpy69vpx-5":{"x":866,"y":80}}}];
+
+/* ── Mini Zustand ── */
+function createStore(init) {
+  let state;
+  const listeners = new Set();
+  const setState = (up) => {
+    const patch = typeof up === 'function' ? up(state) : up;
+    state = { ...state, ...patch };
+    listeners.forEach(l => l());
+    // Auto-persist (data only)
+    try {
+      const {processes,activeId} = state;
+      localStorage.setItem('pd-v2', JSON.stringify({processes,activeId}));
+    } catch {}
+  };
+  const getState = () => state;
+  state = init(setState, getState);
+  // Load persisted data (or seed with sample processes if empty)
+  try {
+    const saved = JSON.parse(localStorage.getItem('pd-v2') || 'null');
+    if (saved?.processes?.length) {
+      state = {...state, processes:saved.processes, activeId:saved.activeId||null};
+    } else {
+      // 샘플 프로세스 기본 탑재
+      state = {...state, processes: SAMPLE_PROCESSES, activeId: SAMPLE_PROCESSES[0].id};
+    }
+  } catch {}
+  function useStore(sel) {
+    sel = sel || (s => s);
+    const [, tick] = React.useReducer(x => x+1, 0);
+    const selRef = React.useRef(sel); selRef.current = sel;
+    const valRef = React.useRef(sel(state));
+    React.useEffect(() => {
+      const check = () => { const n=selRef.current(state); if(n!==valRef.current){valRef.current=n;tick();} };
+      listeners.add(check); return () => listeners.delete(check);
+    }, []);
+    return sel(state);
+  }
+  useStore.getState = getState;
+  useStore.setState = setState;
+  return useStore;
+}
+
+/* ── Constants ── */
+const NW=172,NH=74,CW=2400,CH=1400;
+const MOD = {
+  'form':         {label:'입력 폼',  icon:'📋',color:'#2563EB',bg:'#DBEAFE',bdr:'#93C5FD'},
+  'approval':     {label:'승인',     icon:'✅',color:'#059669',bg:'#D1FAE5',bdr:'#6EE7B7'},
+  'notification': {label:'알림',     icon:'🔔',color:'#D97706',bg:'#FEF3C7',bdr:'#FCD34D'},
+  'document-gen': {label:'문서생성', icon:'📄',color:'#7C3AED',bg:'#EDE9FE',bdr:'#C4B5FD'},
+  'dashboard':    {label:'대시보드', icon:'📊',color:'#DC2626',bg:'#FEE2E2',bdr:'#FCA5A5'},
+};
+let _id=0;
+function uid(p='id'){return `${p}-${Date.now().toString(36)}-${(++_id).toString(36)}`;}
+const _cnt={};
+function autoLabel(t){_cnt[t]=(_cnt[t]||0)+1;return `${MOD[t].label} ${_cnt[t]}`;}
+function defConfig(type){
+  switch(type){
+    case 'form':         return {title:'새 폼',fields:[],submitLabel:'다음'};
+    case 'approval':     return {title:'검토',description:'',approveLabel:'승인',rejectLabel:'반려',resultKey:'approved',commentKey:'comment'};
+    case 'notification': return {title:'알림',messageTemplate:'{{title}} 이(가) 처리되었습니다.',autoAdvance:true};
+    case 'document-gen': return {title:'문서 생성',template:'제목: {{title}}\n작성자: {{author}}\n\n[내용]\n{{content}}',outputKey:'document'};
+    case 'dashboard':    return {title:'현황판',groupByKey:'_state',cardTitleKey:'title',cardSubtitleKey:'',columns:[]};
+    default:             return {};
+  }
+}
+
+/* ── Utils ── */
+function collectContextVars(process) {
+  if(!process) return [];
+  const vars=[]; const seen=new Set();
+  function add(key,label,type,from){if(key&&!seen.has(key)){seen.add(key);vars.push({key,label:label||key,type,from});}}
+  for(const st of process.states||[]){
+    const{type,config}=st.module;
+    if(type==='form') for(const f of config.fields||[]) add(f.key,f.label,f.type,st.label);
+    if(type==='approval'){add(config.resultKey,config.resultKey,'boolean',st.label);if(config.commentKey)add(config.commentKey,config.commentKey,'text',st.label);}
+    if(type==='document-gen') add(config.outputKey,config.outputKey,'text',st.label);
+  }
+  return vars;
+}
+
+function buildContextSchema(process){
+  const schema={};
+  for(const v of collectContextVars(process)) schema[v.key]={type:v.type,label:v.label};
+  return schema;
+}
+
+/* ── json-logic eval ── */
+function evalCond(rule,ctx){
+  if(!rule||rule===true) return true;
+  if(rule===false) return false;
+  try{return Boolean(jsonLogic.apply(rule,ctx));}catch{return false;}
+}
+function getAvailTrans(def,stateId,ctx){
+  return(def.transitions||[]).filter(t=>t.from===stateId&&evalCond(t.condition,ctx));
+}
+
+/* ── template interpolation ── */
+function interpolate(tmpl,ctx){
+  return(tmpl||'').replace(/\{\{(\w+)\}\}/g,(_,k)=>ctx[k]!=null?String(ctx[k]):'');
+}
+
+/* ── Store ── */
+const useStore = createStore((set,get)=>{
+  const getActive=()=>{const s=get();return s.processes.find(p=>p.id===s.activeId)??null;};
+  const upActive=fn=>set(s=>({processes:s.processes.map(p=>p.id===s.activeId?fn(p):p)}));
+  return {
+    processes:[],activeId:null,
+    selectedNodeId:null,selectedTransId:null,
+    drag:null,rTab:'config',connectTarget:null,
+    testRunOpen:false,
+
+    getActive,
+
+    newProcess(){
+      const id=uid('proc');
+      const p={id,name:'새 프로세스',icon:'⚙️',description:'',version:'1.0.0',initialState:null,states:[],transitions:[],_layout:{}};
+      set(s=>({processes:[...s.processes,p],activeId:id,selectedNodeId:null,selectedTransId:null}));
+    },
+    setActive(id){set({activeId:id,selectedNodeId:null,selectedTransId:null});},
+    deleteProcess(id){set(s=>{const procs=s.processes.filter(p=>p.id!==id);return{processes:procs,activeId:s.activeId===id?(procs[0]?.id??null):s.activeId};});},
+    dupProcess(id){const p=get().processes.find(x=>x.id===id);if(!p)return;const np={...p,id:uid('proc'),name:p.name+' (복사)'};set(s=>({processes:[...s.processes,np],activeId:np.id}));},
+    updateMeta(patch){upActive(p=>({...p,...patch}));},
+
+    addNode(type,x,y){
+      const id=uid('state');
+      const node={id,label:autoLabel(type),terminal:false,module:{type,config:defConfig(type)}};
+      upActive(p=>{const states=[...p.states,node];const _layout={...p._layout,[id]:{x:Math.max(10,x),y:Math.max(10,y)}};return{...p,states,_layout,initialState:p.initialState??id};});
+      set({selectedNodeId:id,selectedTransId:null});
+    },
+    moveNode(id,x,y){upActive(p=>({...p,_layout:{...p._layout,[id]:{x:Math.max(0,x),y:Math.max(0,y)}}}));},
+    updateNode(id,patch){upActive(p=>({...p,states:p.states.map(s=>s.id===id?{...s,...patch}:s)}));},
+    updateModuleConfig(id,cfg){upActive(p=>({...p,states:p.states.map(s=>s.id===id?{...s,module:{...s.module,config:cfg}}:s)}));},
+    deleteNode(id){
+      upActive(p=>{const states=p.states.filter(s=>s.id!==id);const transitions=p.transitions.filter(t=>t.from!==id&&t.to!==id);const _layout={...p._layout};delete _layout[id];const initialState=p.initialState===id?(states[0]?.id??null):p.initialState;return{...p,states,transitions,_layout,initialState};});
+      set(s=>({selectedNodeId:s.selectedNodeId===id?null:s.selectedNodeId}));
+    },
+    setInitial(id){upActive(p=>({...p,initialState:id}));},
+    toggleTerminal(id){upActive(p=>({...p,states:p.states.map(s=>s.id===id?{...s,terminal:!s.terminal}:s)}));},
+
+    addTrans(fromId,toId){
+      const p=getActive();if(!p||fromId===toId)return;
+      if(p.transitions.some(t=>t.from===fromId&&t.to===toId))return;
+      const id=uid('trans');const toNode=p.states.find(s=>s.id===toId);
+      const t={id,from:fromId,to:toId,label:toNode?.label??'다음',trigger:'manual',condition:null};
+      upActive(p=>({...p,transitions:[...p.transitions,t]}));
+      set({selectedTransId:id,selectedNodeId:null});
+    },
+    updateTrans(id,patch){upActive(p=>({...p,transitions:p.transitions.map(t=>t.id===id?{...t,...patch}:t)}));},
+    deleteTrans(id){upActive(p=>({...p,transitions:p.transitions.filter(t=>t.id!==id)}));set(s=>({selectedTransId:s.selectedTransId===id?null:s.selectedTransId}));},
+
+    selectNode(id){set({selectedNodeId:id,selectedTransId:null});},
+    selectTrans(id){set({selectedTransId:id,selectedNodeId:null});},
+    clearSel(){set({selectedNodeId:null,selectedTransId:null});},
+    setDrag(d){set({drag:d});},
+    setConnTgt(id){set({connectTarget:id});},
+    setRTab(t){set({rTab:t});},
+    setTestRun(v){set({testRunOpen:v});},
+
+    autoArrange(){
+      const p=getActive();if(!p||!p.states.length)return;
+      const start=p.initialState??p.states[0].id;
+      const levels={};const vis=new Set();const q=[[start,0]];vis.add(start);
+      while(q.length){const[id,lv]=q.shift();levels[id]=lv;for(const t of p.transitions.filter(t=>t.from===id&&!vis.has(t.to))){vis.add(t.to);q.push([t.to,lv+1]);}}
+      const maxLv=Math.max(0,...Object.values(levels));
+      p.states.forEach(s=>{if(!(s.id in levels))levels[s.id]=maxLv+1;});
+      const byLv={};Object.entries(levels).forEach(([id,lv])=>{byLv[lv]=byLv[lv]||[];byLv[lv].push(id);});
+      const maxPer=Math.max(...Object.values(byLv).map(a=>a.length));
+      const GAP_X=NW+90,GAP_Y=NH+50,SX=80,SY=80;const _layout={...p._layout};
+      Object.entries(byLv).forEach(([lv,ids])=>{const colH=ids.length*(NH+50)-50;const startY=SY+(maxPer*(NH+50)-50-colH)/2;ids.forEach((id,i)=>{_layout[id]={x:SX+Number(lv)*GAP_X,y:startY+i*(NH+50)};});});
+      upActive(p=>({...p,_layout}));
+    },
+
+    getJSON(){
+      const p=getActive();if(!p)return'{}';
+      const{_layout,...def}=p;def.contextSchema=buildContextSchema(p);
+      return JSON.stringify(def,null,2);
+    },
+  };
+});
+</script>
+
+<script type="text/babel">
+const{useState,useEffect,useRef,useReducer,useCallback}=React;
+
+/* ═══════════════════════════════════
+   DESIGNER: Arrow, NodeCard, Canvas
+   ═══════════════════════════════════ */
+function Arrow({trans,fx,fy,tx,ty,selected,onClick}){
+  const bend=Math.max(70,Math.abs(tx-fx)*.45);
+  const d=`M${fx},${fy} C${fx+bend},${fy} ${tx-bend},${ty} ${tx},${ty}`;
+  const mx=0.125*fx+0.375*(fx+bend)+0.375*(tx-bend)+0.125*tx;
+  const my=0.125*fy+0.375*fy+0.375*ty+0.125*ty-14;
+  const stroke=selected?'#6366F1':'#94A3B8';
+  return(
+    <g>
+      <path d={d} fill="none" stroke="transparent" strokeWidth={18} style={{pointerEvents:'stroke',cursor:'pointer'}} onClick={onClick}/>
+      <path d={d} fill="none" stroke={stroke} strokeWidth={selected?2.5:1.8} markerEnd={`url(#ah-${selected?'sel':'def'})`} style={{pointerEvents:'none',transition:'stroke .12s'}}/>
+      <foreignObject x={mx-44} y={my-12} width={88} height={24} style={{pointerEvents:'none',overflow:'visible'}}>
+        <div xmlns="http://www.w3.org/1999/xhtml" style={{fontSize:10,fontWeight:700,textAlign:'center',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:86,color:selected?'#4F46E5':'#64748B',background:'white',border:`1.5px solid ${selected?'#818CF8':'#E2E8F0'}`,borderRadius:5,padding:'2px 7px',boxShadow:'0 1px 3px rgba(0,0,0,.08)'}}>
+          {trans.trigger==='auto'?'⚡ ':''}{trans.label}
+        </div>
+      </foreignObject>
+    </g>
+  );
+}
+
+function NodeCard({node,selected,isInitial,isConnTarget,onMouseDownBody,onMouseDownPort}){
+  const def=MOD[node.module.type]||MOD.form;
+  return(
+    <div style={{width:'100%',height:'100%',background:def.bg,border:`2px solid ${selected?'#6366F1':isConnTarget?'#818CF8':def.bdr}`,borderRadius:13,position:'relative',display:'flex',alignItems:'center',padding:'0 14px',gap:10,boxShadow:selected?'0 0 0 3px rgba(99,102,241,.22),0 4px 14px rgba(0,0,0,.12)':'0 2px 8px rgba(0,0,0,.07)',cursor:'grab',transition:'border-color .12s,box-shadow .12s'}}
+      onMouseDown={onMouseDownBody}>
+      {isInitial&&<div className="badge-start">START</div>}
+      {node.terminal&&<div className="badge-end">END</div>}
+      <div className={`port-in${isConnTarget?' drop-target':''}`}/>
+      <div style={{width:36,height:36,borderRadius:9,background:`${def.color}1A`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,flexShrink:0}}>{def.icon}</div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:12,fontWeight:700,color:'#1E293B',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{node.label}</div>
+        <div style={{fontSize:10,color:def.color,fontWeight:600,marginTop:1}}>{def.label}</div>
+      </div>
+      <div className="port-out" style={{color:def.color}} onMouseDown={onMouseDownPort}/>
+    </div>
+  );
+}
+
+function Canvas({wrapRef}){
+  const s=useStore();
+  const active=s.getActive();
+  const{drag,connectTarget,selectedNodeId,selectedTransId}=s;
+  const isConn=drag?.type==='connect',isMove=drag?.type==='move';
+
+  function toCanvas(e){const el=wrapRef.current;if(!el)return{x:0,y:0};const r=el.getBoundingClientRect();return{x:e.clientX-r.left+el.scrollLeft,y:e.clientY-r.top+el.scrollTop};}
+  function portOut(id){const l=active?._layout?.[id];if(!l)return{x:0,y:0};return{x:l.x+NW,y:l.y+NH/2};}
+  function portIn(id) {const l=active?._layout?.[id];if(!l)return{x:0,y:0};return{x:l.x,y:l.y+NH/2};}
+
+  useEffect(()=>{
+    const onMove=e=>{
+      const d=useStore.getState().drag;if(!d)return;
+      const el=wrapRef.current;if(!el)return;
+      const r=el.getBoundingClientRect();
+      const cx=e.clientX-r.left+el.scrollLeft,cy=e.clientY-r.top+el.scrollTop;
+      if(d.type==='move') useStore.getState().moveNode(d.nodeId,cx-d.offX,cy-d.offY);
+      else if(d.type==='connect'){
+        useStore.setState({drag:{...d,curX:cx,curY:cy}});
+        const el2=document.elementFromPoint(e.clientX,e.clientY);
+        const nw=el2?.closest?.('[data-nodeid]');
+        useStore.setState({connectTarget:nw?.dataset?.nodeid&&nw.dataset.nodeid!==d.fromNodeId?nw.dataset.nodeid:null});
+      }
+    };
+    const onUp=()=>{
+      const d=useStore.getState().drag;if(!d)return;
+      if(d.type==='connect'){const tgt=useStore.getState().connectTarget;if(tgt)useStore.getState().addTrans(d.fromNodeId,tgt);}
+      useStore.setState({drag:null,connectTarget:null});
+    };
+    window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
+    return()=>{window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);};
+  },[]);
+
+  if(!active) return(
+    <div ref={wrapRef} className="flex-1 canvas-scroll" style={{overflow:'auto',display:'flex',alignItems:'center',justifyContent:'center',background:'#F1F5F9'}}>
+      <div style={{textAlign:'center',color:'#94A3B8'}}>
+        <div style={{fontSize:52,marginBottom:12}}>⚙️</div>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:4}}>프로세스를 선택하거나 새로 만드세요</div>
+        <div style={{fontSize:12}}>좌측 "+ 새로만들기" 클릭</div>
+      </div>
+    </div>
+  );
+
+  const{states=[],transitions=[],_layout:{}}=active;
+  const layout=active._layout||{};
+  return(
+    <div ref={wrapRef} className={`flex-1 canvas-scroll ${isConn?'is-connecting':isMove?'is-moving':''}`}
+      style={{overflow:'auto',position:'relative'}}
+      onDragOver={e=>e.preventDefault()}
+      onDrop={e=>{e.preventDefault();const type=e.dataTransfer.getData('moduleType');if(!type)return;const c=toCanvas(e);s.addNode(type,c.x-NW/2,c.y-NH/2);}}
+      onClick={()=>s.clearSel()}>
+      <div className="canvas-grid" style={{width:CW,height:CH,position:'relative'}}>
+        <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',zIndex:2,pointerEvents:'none',overflow:'visible'}}>
+          <defs>
+            <marker id="ah-def" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L0,7 L9,3.5 z" fill="#94A3B8"/></marker>
+            <marker id="ah-sel" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L0,7 L9,3.5 z" fill="#6366F1"/></marker>
+          </defs>
+          {transitions.map(t=>{const fp=portOut(t.from),tp=portIn(t.to);return<Arrow key={t.id} trans={t} fx={fp.x} fy={fp.y} tx={tp.x} ty={tp.y} selected={selectedTransId===t.id} onClick={e=>{e.stopPropagation();s.selectTrans(t.id);}}/>;}) }
+          {isConn&&drag.fromNodeId&&(()=>{const fp=portOut(drag.fromNodeId);const tx2=drag.curX??fp.x+80,ty2=drag.curY??fp.y;const bend=Math.max(70,Math.abs(tx2-fp.x)*.45);return<path d={`M${fp.x},${fp.y} C${fp.x+bend},${fp.y} ${tx2-bend},${ty2} ${tx2},${ty2}`} fill="none" stroke="#6366F1" strokeWidth={2} strokeDasharray="8 5" className="anim-dash" style={{pointerEvents:'none'}}/>;})()}
+        </svg>
+        <div style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',zIndex:3}}>
+          {(active.states||[]).map(node=>{
+            const pos=layout[node.id]||{x:100,y:100};
+            return(
+              <div key={node.id} data-nodeid={node.id} className="node-wrap"
+                style={{left:pos.x,top:pos.y,width:NW,height:NH,zIndex:selectedNodeId===node.id?12:4}}
+                onClick={e=>e.stopPropagation()}>
+                <NodeCard node={node} selected={selectedNodeId===node.id} isInitial={active.initialState===node.id} isConnTarget={connectTarget===node.id}
+                  onMouseDownBody={e=>{if(e.button!==0)return;e.stopPropagation();if(useStore.getState().drag?.type==='connect')return;s.selectNode(node.id);const c=toCanvas(e);s.setDrag({type:'move',nodeId:node.id,offX:c.x-pos.x,offY:c.y-pos.y});}}
+                  onMouseDownPort={e=>{e.stopPropagation();e.preventDefault();const c=toCanvas(e);s.setDrag({type:'connect',fromNodeId:node.id,curX:c.x,curY:c.y});}}/>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════
+   MODULE CONFIG EDITORS (Step 2)
+   ═══════════════════════════════════ */
+function VarChips({vars,onInsert}){
+  if(!vars.length)return null;
+  return(<div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:6}}>{vars.map(v=><button key={v.key} className="var-chip" onClick={()=>onInsert(v.key)} title={`${v.label} (${v.type})`}>{`{{${v.key}}}`}</button>)}</div>);
+}
+function TemplateEditor({value,onChange,rows=4,vars}){
+  const ref=useRef(null);
+  function insert(key){const el=ref.current;if(!el){onChange(value+`{{${key}}}`);return;}const s2=el.selectionStart,e2=el.selectionEnd;onChange(value.slice(0,s2)+`{{${key}}}`+value.slice(e2));setTimeout(()=>{el.selectionStart=el.selectionEnd=s2+key.length+4;el.focus();},0);}
+  return(<div><VarChips vars={vars||[]} onInsert={insert}/><textarea ref={ref} rows={rows} className="pp-input" style={{resize:'vertical',fontFamily:'monospace',fontSize:11,lineHeight:1.6}} value={value} onChange={e=>onChange(e.target.value)}/></div>);
+}
+function FieldRow({field,idx,total,onChange,onRemove,onMove}){
+  const[open,setOpen]=useState(false);
+  return(
+    <div className="field-row">
+      <div className="field-row-hd" onClick={()=>setOpen(!open)}>
+        <span style={{flex:1,fontSize:11,fontWeight:700,color:'#1E293B',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{field.label||'(미입력)'}</span>
+        <span style={{fontSize:10,color:'#94A3B8',flexShrink:0}}>{field.type}</span>
+        {field.required&&<span style={{fontSize:9,color:'#DC2626',fontWeight:800,flexShrink:0}}>필수</span>}
+        {idx>0&&<button onClick={e=>{e.stopPropagation();onMove(-1);}} style={iconBtn}>▲</button>}
+        {idx<total-1&&<button onClick={e=>{e.stopPropagation();onMove(1);}} style={iconBtn}>▼</button>}
+        <button onClick={e=>{e.stopPropagation();onRemove();}} style={{...iconBtn,color:'#EF4444'}}>✕</button>
+        <span style={{fontSize:10,color:'#94A3B8',marginLeft:2}}>{open?'▾':'▸'}</span>
+      </div>
+      {open&&(
+        <div className="field-row-bd">
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,marginBottom:7}}>
+            <Field label="키 (영문)"><input className="pp-input" value={field.key} onChange={e=>onChange({key:e.target.value.replace(/\s/g,'_')})}/></Field>
+            <Field label="레이블"><input className="pp-input" value={field.label} onChange={e=>onChange({label:e.target.value})}/></Field>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,marginBottom:7}}>
+            <Field label="타입">
+              <select className="pp-input" value={field.type} onChange={e=>onChange({type:e.target.value})}>
+                {['string','text','number','boolean','select','date'].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="필수"><label style={{display:'flex',alignItems:'center',gap:6,marginTop:8,cursor:'pointer'}}><input type="checkbox" checked={!!field.required} onChange={e=>onChange({required:e.target.checked})}/><span style={{fontSize:11,color:'#475569'}}>필수 입력</span></label></Field>
+          </div>
+          {field.type==='select'&&<Field label="선택지 (쉼표)"><input className="pp-input" placeholder="높음,중간,낮음" value={(field.options||[]).join(',')} onChange={e=>onChange({options:e.target.value.split(',').map(x=>x.trim()).filter(Boolean)})}/></Field>}
+          {['string','text','number'].includes(field.type)&&<Field label="Placeholder"><input className="pp-input" value={field.placeholder||''} onChange={e=>onChange({placeholder:e.target.value})}/></Field>}
+        </div>
+      )}
+    </div>
+  );
+}
+function FormConfig({config,onChange}){
+  const fields=config.fields||[];
+  const upF=(i,p)=>onChange({...config,fields:fields.map((f,fi)=>fi===i?{...f,...p}:f)});
+  return(
+    <div>
+      <Field label="폼 제목"><input className="pp-input" value={config.title} onChange={e=>onChange({...config,title:e.target.value})}/></Field>
+      <Field label="제출 버튼"><input className="pp-input" value={config.submitLabel||'다음'} onChange={e=>onChange({...config,submitLabel:e.target.value})}/></Field>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:7}}>
+        <SectionLabel style={{marginBottom:0}}>필드 ({fields.length})</SectionLabel>
+        <button onClick={()=>onChange({...config,fields:[...fields,{key:`field${fields.length+1}`,label:'새 필드',type:'string',required:false}]})} style={addBtn}>+ 추가</button>
+      </div>
+      {fields.length===0&&<div style={{textAlign:'center',padding:'12px',fontSize:11,color:'#94A3B8',border:'1.5px dashed #E2E8F0',borderRadius:8,marginBottom:8}}>필드가 없습니다.</div>}
+      {fields.map((f,i)=><FieldRow key={i} field={f} idx={i} total={fields.length} onChange={p=>upF(i,p)} onRemove={()=>onChange({...config,fields:fields.filter((_,fi)=>fi!==i)})} onMove={dir=>{const a=[...fields],t=i+dir;if(t<0||t>=a.length)return;[a[i],a[t]]=[a[t],a[i]];onChange({...config,fields:a});}}/>)}
+    </div>
+  );
+}
+function ApprovalConfig({config,onChange}){
+  return(
+    <div>
+      <Field label="제목"><input className="pp-input" value={config.title} onChange={e=>onChange({...config,title:e.target.value})}/></Field>
+      <Field label="설명"><input className="pp-input" value={config.description||''} onChange={e=>onChange({...config,description:e.target.value})}/></Field>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+        <Field label="승인 버튼"><input className="pp-input" value={config.approveLabel||'승인'} onChange={e=>onChange({...config,approveLabel:e.target.value})}/></Field>
+        <Field label="반려 버튼"><input className="pp-input" value={config.rejectLabel||'반려'} onChange={e=>onChange({...config,rejectLabel:e.target.value})}/></Field>
+        <Field label="결과 키"><input className="pp-input" placeholder="approved" value={config.resultKey||''} onChange={e=>onChange({...config,resultKey:e.target.value.replace(/\s/g,'_')})}/></Field>
+        <Field label="코멘트 키"><input className="pp-input" placeholder="comment" value={config.commentKey||''} onChange={e=>onChange({...config,commentKey:e.target.value.replace(/\s/g,'_')})}/></Field>
+      </div>
+    </div>
+  );
+}
+function NotifConfig({config,onChange,ctxVars}){
+  return(
+    <div>
+      <Field label="제목"><input className="pp-input" value={config.title} onChange={e=>onChange({...config,title:e.target.value})}/></Field>
+      <Field label="메시지 템플릿"><TemplateEditor rows={3} vars={ctxVars} value={config.messageTemplate||''} onChange={v=>onChange({...config,messageTemplate:v})}/></Field>
+      <label style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',cursor:'pointer'}}>
+        <input type="checkbox" checked={!!config.autoAdvance} onChange={e=>onChange({...config,autoAdvance:e.target.checked})}/>
+        <div><div style={{fontSize:11,fontWeight:700,color:'#1E293B'}}>자동 진행</div><div style={{fontSize:10,color:'#64748B'}}>알림 후 자동으로 다음 단계</div></div>
+      </label>
+    </div>
+  );
+}
+function DocGenConfig({config,onChange,ctxVars}){
+  return(
+    <div>
+      <Field label="제목"><input className="pp-input" value={config.title} onChange={e=>onChange({...config,title:e.target.value})}/></Field>
+      <Field label="출력 키"><input className="pp-input" placeholder="document" value={config.outputKey||''} onChange={e=>onChange({...config,outputKey:e.target.value.replace(/\s/g,'_')})}/></Field>
+      <Field label="문서 템플릿"><TemplateEditor rows={8} vars={ctxVars} value={config.template||''} onChange={v=>onChange({...config,template:v})}/></Field>
+    </div>
+  );
+}
+function DashConfig({config,onChange,ctxVars}){
+  const cols=config.columns||[];
+  const varKeys=[{key:'',label:'(없음)'},...ctxVars.map(v=>({key:v.key,label:`${v.key}`}))];
+  return(
+    <div>
+      <Field label="제목"><input className="pp-input" value={config.title} onChange={e=>onChange({...config,title:e.target.value})}/></Field>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+        <Field label="카드 제목 필드"><select className="pp-input" value={config.cardTitleKey||''} onChange={e=>onChange({...config,cardTitleKey:e.target.value})}>{varKeys.map(v=><option key={v.key} value={v.key}>{v.label}</option>)}</select></Field>
+        <Field label="카드 부제목"><select className="pp-input" value={config.cardSubtitleKey||''} onChange={e=>onChange({...config,cardSubtitleKey:e.target.value})}>{varKeys.map(v=><option key={v.key} value={v.key}>{v.label}</option>)}</select></Field>
+      </div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:7}}>
+        <SectionLabel style={{marginBottom:0}}>칸반 컬럼</SectionLabel>
+        <button onClick={()=>onChange({...config,columns:[...cols,{value:'',label:'새 컬럼'}]})} style={addBtn}>+ 추가</button>
+      </div>
+      {cols.map((c,i)=>(
+        <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:5,marginBottom:5,alignItems:'center'}}>
+          <input className="pp-input" placeholder="state id" value={c.value} onChange={e=>onChange({...config,columns:cols.map((x,ci)=>ci===i?{...x,value:e.target.value}:x)})}/>
+          <input className="pp-input" placeholder="레이블" value={c.label} onChange={e=>onChange({...config,columns:cols.map((x,ci)=>ci===i?{...x,label:e.target.value}:x)})}/>
+          <button onClick={()=>onChange({...config,columns:cols.filter((_,ci)=>ci!==i)})} style={{padding:'6px 8px',borderRadius:6,background:'#FEF2F2',border:'1.5px solid #FCA5A5',color:'#DC2626',cursor:'pointer',fontSize:11}}>✕</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+function ModuleConfigEditor({node,active,s}){
+  const{type,config}=node.module;
+  const ctxVars=collectContextVars(active);
+  const onChange=cfg=>s.updateModuleConfig(node.id,cfg);
+  switch(type){
+    case 'form':         return <FormConfig config={config} onChange={onChange}/>;
+    case 'approval':     return <ApprovalConfig config={config} onChange={onChange}/>;
+    case 'notification': return <NotifConfig config={config} onChange={onChange} ctxVars={ctxVars}/>;
+    case 'document-gen': return <DocGenConfig config={config} onChange={onChange} ctxVars={ctxVars}/>;
+    case 'dashboard':    return <DashConfig config={config} onChange={onChange} ctxVars={ctxVars}/>;
+    default:             return null;
+  }
+}
+
+/* ═══════════════════════════════════
+   STEP 3: Enhanced Condition Editor
+   ═══════════════════════════════════ */
+const COND_OPS=[
+  {v:'==', l:'== (같음)'},
+  {v:'!=', l:'!= (다름)'},
+  {v:'>',  l:'> (초과)'},
+  {v:'>=', l:'>= (이상)'},
+  {v:'<',  l:'< (미만)'},
+  {v:'<=', l:'<= (이하)'},
+];
+
+function ConditionEditor({condition,onChange,ctxVars}){
+  // Detect mode from condition
+  function detectMode(c){
+    if(!c||c===null) return 'none';
+    const k=Object.keys(c||{})[0];
+    if(COND_OPS.some(o=>o.v===k)) return 'simple';
+    if(k==='and'||k==='or') return 'compound';
+    return 'raw';
+  }
+  const[mode,setMode]=useState(()=>detectMode(condition));
+
+  function changeMode(m){
+    setMode(m);
+    if(m==='none') onChange(null);
+    else if(m==='simple') onChange({'==':[{'var':ctxVars[0]?.key||''},'']});
+    else if(m==='compound') onChange({'and':[{'==':[{'var':ctxVars[0]?.key||''},true]},{'==':[{'var':ctxVars[0]?.key||''},true]}]});
+    else onChange(null);
+  }
+
+  return(
+    <div>
+      <Field label="조건 타입">
+        <select className="pp-input" style={{marginBottom:7}} value={mode} onChange={e=>changeMode(e.target.value)}>
+          <option value="none">없음 — 항상 허용</option>
+          <option value="simple">단순 조건 (필드 비교)</option>
+          <option value="compound">복합 조건 (AND / OR)</option>
+          <option value="raw">JSON 직접 입력</option>
+        </select>
+      </Field>
+
+      {mode==='simple'&&<SimpleCondRow cond={condition} vars={ctxVars} onChange={onChange}/>}
+      {mode==='compound'&&<CompoundCond cond={condition} vars={ctxVars} onChange={onChange}/>}
+      {mode==='raw'&&(
+        <textarea className="pp-input" rows={4} style={{fontFamily:'monospace',fontSize:10,resize:'vertical'}}
+          value={condition?JSON.stringify(condition,null,2):'null'}
+          onChange={e=>{try{onChange(JSON.parse(e.target.value));}catch{}}}/>
+      )}
+
+      {condition&&mode!=='none'&&(
+        <div style={{marginTop:6,padding:'6px 9px',background:'#0F172A',borderRadius:7,fontSize:10,fontFamily:'monospace',color:'#94A3B8',wordBreak:'break-all'}}>
+          {JSON.stringify(condition)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SimpleCondRow({cond,vars,onChange}){
+  const op  = cond ? Object.keys(cond)[0] : '==';
+  const arr = cond?.[op] || [{'var':''},null];
+  const key = arr[0]?.var || '';
+  const val = arr[1];
+
+  function build(k,o,v){
+    const varType=vars.find(x=>x.key===k)?.type;
+    let coerced=v;
+    if(v==='true') coerced=true;
+    else if(v==='false') coerced=false;
+    else if(varType==='number'&&!isNaN(Number(v))) coerced=Number(v);
+    onChange({[o]:[{'var':k},coerced]});
+  }
+
+  const varType=vars.find(x=>x.key===key)?.type;
+
+  return(
+    <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:6,alignItems:'center',marginBottom:6}}>
+      <select className="pp-input" value={key} onChange={e=>build(e.target.value,op,val)}>
+        <option value="">-- 변수 --</option>
+        {vars.map(v=><option key={v.key} value={v.key}>{v.key} ({v.type})</option>)}
+      </select>
+      <select className="pp-input" style={{width:90}} value={op} onChange={e=>build(key,e.target.value,val)}>
+        {COND_OPS.map(o=><option key={o.v} value={o.v}>{o.v}</option>)}
+      </select>
+      {varType==='boolean' ? (
+        <select className="pp-input" value={String(val)} onChange={e=>build(key,op,e.target.value)}>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      ) : (
+        <input className="pp-input" placeholder="값" value={String(val??'')} onChange={e=>build(key,op,e.target.value)}/>
+      )}
+    </div>
+  );
+}
+
+function CompoundCond({cond,vars,onChange}){
+  const logOp=cond&&('and' in cond)?'and':'or';
+  const rows=(cond?.[logOp])||[{'==':[{'var':''},null]},{'==':[{'var':''},null]}];
+
+  function update(i,c){const next=[...rows];next[i]=c;onChange({[logOp]:next});}
+  function addRow(){onChange({[logOp]:[...rows,{'==':[{'var':vars[0]?.key||''},null]}]});}
+  function delRow(i){if(rows.length<=2)return;const next=rows.filter((_,ri)=>ri!==i);onChange({[logOp]:next});}
+  function changeLogOp(op){onChange({[op]:rows});}
+
+  return(
+    <div>
+      <div style={{display:'flex',gap:6,marginBottom:8,alignItems:'center'}}>
+        {['and','or'].map(o=>(
+          <button key={o} onClick={()=>changeLogOp(o)} style={{padding:'4px 12px',borderRadius:6,fontSize:11,fontWeight:700,cursor:'pointer',border:`1.5px solid ${logOp===o?'#6366F1':'#E2E8F0'}`,background:logOp===o?'#EEF2FF':'#F8FAFC',color:logOp===o?'#4F46E5':'#64748B'}}>
+            {o.toUpperCase()}
+          </button>
+        ))}
+        <span style={{fontSize:10,color:'#94A3B8'}}>조건을 {logOp==='and'?'모두':'하나라도'} 만족해야 통과</span>
+      </div>
+      {rows.map((r,i)=>(
+        <div key={i} style={{display:'flex',gap:5,alignItems:'flex-start',marginBottom:5}}>
+          <div style={{flex:1}}><SimpleCondRow cond={r} vars={vars} onChange={c=>update(i,c)}/></div>
+          {rows.length>2&&<button onClick={()=>delRow(i)} style={{padding:'6px 8px',borderRadius:6,background:'#FEF2F2',border:'1.5px solid #FCA5A5',color:'#DC2626',cursor:'pointer',fontSize:11,flexShrink:0,marginTop:1}}>✕</button>}
+        </div>
+      ))}
+      <button onClick={addRow} style={{...addBtn,marginTop:4}}>+ 조건 추가</button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════
+   TEST RUN ENGINE (Step 5)
+   ═══════════════════════════════════ */
+
+/* ── Run: StepNav ── */
+function RunStepNav({def,currentStateId}){
+  const idx=def.states.findIndex(s=>s.id===currentStateId);
+  return(
+    <div style={{padding:'12px 20px',background:'#F8FAFC',borderBottom:'1px solid #E2E8F0',overflowX:'auto'}}>
+      <div style={{display:'flex',alignItems:'center',minWidth:'max-content'}}>
+        {def.states.map((st,i)=>{
+          const done=i<idx,cur=i===idx;
+          return(
+            <div key={st.id} style={{display:'flex',alignItems:'center',flexShrink:0}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+                <div style={{width:30,height:30,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,transition:'.2s',background:done?'#10B981':cur?'#6366F1':'#E2E8F0',color:done||cur?'white':'#94A3B8',boxShadow:cur?'0 0 0 3px rgba(99,102,241,.25)':'none'}}>
+                  {done?'✓':i+1}
+                </div>
+                <span style={{fontSize:10,marginTop:4,color:cur?'#6366F1':done?'#10B981':'#94A3B8',fontWeight:cur?700:500,maxWidth:64,textAlign:'center',lineHeight:1.3}}>{st.label}</span>
+              </div>
+              {i<def.states.length-1&&<div style={{width:32,height:2,margin:'0 4px',marginBottom:16,background:i<idx?'#10B981':'#E2E8F0',transition:'.2s'}}/>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Run: Form Module ── */
+function RunFormModule({config,context,availTrans,onContextUpdate,onTransition}){
+  const formRef=useRef(null);
+  const[errors,setErrors]=useState({});
+  function submit(tId){
+    const form=formRef.current;if(!form)return;
+    const vals={};
+    for(const f of config.fields||[]){const el=form.querySelector(`[data-key="${f.key}"]`);if(el)vals[f.key]=el.type==='checkbox'?el.checked:el.value;}
+    const e={};
+    for(const f of config.fields||[])if(f.required&&!vals[f.key]&&vals[f.key]!==0)e[f.key]=`${f.label}은(는) 필수입니다.`;
+    setErrors(e);if(Object.keys(e).length>0)return;
+    onContextUpdate(vals);onTransition(tId);
+  }
+  return(
+    <div>
+      <h3 style={{fontSize:17,fontWeight:800,color:'#1E293B',marginBottom:16}}>{config.title}</h3>
+      <div ref={formRef} style={{display:'flex',flexDirection:'column',gap:12}}>
+        {(config.fields||[]).map(f=>(
+          <div key={f.key}>
+            <label style={{display:'block',fontSize:12,fontWeight:700,color:'#475569',marginBottom:5}}>{f.label}{f.required&&<span style={{color:'#EF4444',marginLeft:3}}>*</span>}</label>
+            {f.type==='select'?(
+              <select data-key={f.key} className="run-form-input" defaultValue={String(context[f.key]||'')}>
+                <option value="">선택하세요</option>
+                {(f.options||[]).map(o=><option key={o} value={o}>{o}</option>)}
+              </select>
+            ):f.type==='text'?(
+              <textarea data-key={f.key} rows={3} className="run-form-input" style={{resize:'vertical'}} placeholder={f.placeholder||''} defaultValue={String(context[f.key]||'')}/>
+            ):f.type==='boolean'?(
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
+                <input data-key={f.key} type="checkbox" defaultChecked={!!context[f.key]} style={{width:16,height:16}}/>
+                <span style={{fontSize:13,color:'#475569'}}>{f.placeholder||'예'}</span>
+              </label>
+            ):(
+              <input data-key={f.key} type={f.type==='number'?'number':f.type==='date'?'date':'text'} className="run-form-input" placeholder={f.placeholder||''} defaultValue={String(context[f.key]||'')}/>
+            )}
+            {errors[f.key]&&<p style={{fontSize:11,color:'#EF4444',marginTop:4}}>{errors[f.key]}</p>}
+          </div>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:20}}>
+        {availTrans.map(t=>(
+          <button key={t.id} onClick={()=>submit(t.id)} style={{padding:'9px 20px',borderRadius:9,fontSize:13,fontWeight:700,background:'#6366F1',color:'white',border:'none',cursor:'pointer'}}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Run: Approval Module ── */
+function RunApprovalModule({config,context,availTrans,onContextUpdate,onTransition}){
+  const[comment,setComment]=useState(context[config.commentKey]||'');
+  const approveT=availTrans.find(t=>t.label.includes('승인')||t.label.includes('통과')||t.label.includes('완료'))||availTrans[0];
+  const rejectT =availTrans.find(t=>t.label.includes('반려')||t.label.includes('수정')||t.label.includes('재'))||availTrans[1];
+
+  function decide(approved,tId){
+    const patch={[config.resultKey]:approved};
+    if(config.commentKey)patch[config.commentKey]=comment;
+    onContextUpdate(patch);onTransition(tId);
+  }
+  const entries=Object.entries(context).filter(([,v])=>v!==''&&v!==undefined&&v!==false);
+  return(
+    <div>
+      <h3 style={{fontSize:17,fontWeight:800,color:'#1E293B',marginBottom:4}}>{config.title}</h3>
+      {config.description&&<p style={{fontSize:12,color:'#64748B',marginBottom:14}}>{config.description}</p>}
+      {entries.length>0&&(
+        <div style={{background:'#F8FAFC',border:'1.5px solid #E2E8F0',borderRadius:10,padding:14,marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:800,color:'#94A3B8',textTransform:'uppercase',letterSpacing:.7,marginBottom:8}}>검토 내용</div>
+          {entries.map(([k,v])=>(
+            <div key={k} style={{display:'flex',gap:10,fontSize:12,marginBottom:4}}>
+              <span style={{color:'#94A3B8',minWidth:80,flexShrink:0}}>{k}</span>
+              <span style={{color:'#1E293B',fontWeight:600}}>{String(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {config.commentKey&&(
+        <div style={{marginBottom:16}}>
+          <label style={{display:'block',fontSize:12,fontWeight:700,color:'#475569',marginBottom:5}}>코멘트 (선택)</label>
+          <textarea rows={3} className="run-form-input" style={{resize:'vertical'}} placeholder="검토 의견을 입력하세요" value={comment} onChange={e=>setComment(e.target.value)}/>
+        </div>
+      )}
+      <div style={{display:'flex',gap:8}}>
+        {approveT&&<button onClick={()=>decide(true,approveT.id)} style={{padding:'9px 20px',borderRadius:9,fontSize:13,fontWeight:700,background:'#10B981',color:'white',border:'none',cursor:'pointer'}}>✓ {config.approveLabel||approveT.label}</button>}
+        {rejectT &&<button onClick={()=>decide(false,rejectT.id)} style={{padding:'9px 20px',borderRadius:9,fontSize:13,fontWeight:700,background:'#EF4444',color:'white',border:'none',cursor:'pointer'}}>✕ {config.rejectLabel||rejectT.label}</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Run: Notification Module ── */
+function RunNotifModule({config,context,availTrans,onTransition,onComplete}){
+  const msg=interpolate(config.messageTemplate,context);
+  const firedRef=useRef(false);
+  useEffect(()=>{
+    if(firedRef.current)return;firedRef.current=true;
+    if(config.autoAdvance){const t=availTrans[0];setTimeout(()=>{if(t)onTransition(t.id);else onComplete();},900);}
+  },[]);
+  return(
+    <div>
+      <h3 style={{fontSize:17,fontWeight:800,color:'#1E293B',marginBottom:12}}>{config.title}</h3>
+      <div style={{background:'#EFF6FF',border:'1.5px solid #93C5FD',borderRadius:12,padding:18,fontSize:14,color:'#1D4ED8',lineHeight:1.6,marginBottom:16}}>
+        🔔 {msg}
+      </div>
+      {!config.autoAdvance&&(
+        <div style={{display:'flex',gap:8}}>
+          {availTrans.map(t=><button key={t.id} onClick={()=>onTransition(t.id)} style={{padding:'9px 20px',borderRadius:9,fontSize:13,fontWeight:700,background:'#6366F1',color:'white',border:'none',cursor:'pointer'}}>{t.label}</button>)}
+        </div>
+      )}
+      {config.autoAdvance&&<p style={{fontSize:11,color:'#94A3B8'}}>자동으로 다음 단계로 이동합니다...</p>}
+    </div>
+  );
+}
+
+/* ── Run: Document Gen Module ── */
+function RunDocGenModule({config,context,onContextUpdate,availTrans,onTransition}){
+  const generated=interpolate(config.template,context);
+  const savedRef=useRef(false);
+  useEffect(()=>{if(savedRef.current)return;savedRef.current=true;onContextUpdate({[config.outputKey]:generated});},[]); // eslint-disable-line
+  function download(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([generated],{type:'text/plain'}));a.download=`${config.outputKey}.txt`;a.click();}
+  return(
+    <div>
+      <h3 style={{fontSize:17,fontWeight:800,color:'#1E293B',marginBottom:12}}>{config.title}</h3>
+      <pre style={{background:'#F8FAFC',border:'1.5px solid #E2E8F0',borderRadius:12,padding:18,fontSize:12,fontFamily:'monospace',whiteSpace:'pre-wrap',lineHeight:1.7,maxHeight:280,overflow:'auto',marginBottom:16}}>{generated}</pre>
+      <div style={{display:'flex',gap:8}}>
+        <button onClick={download} style={{padding:'8px 16px',borderRadius:8,fontSize:12,fontWeight:700,background:'#F1F5F9',border:'1.5px solid #CBD5E1',color:'#475569',cursor:'pointer'}}>⬇ 다운로드</button>
+        {availTrans.map(t=><button key={t.id} onClick={()=>onTransition(t.id)} style={{padding:'9px 20px',borderRadius:9,fontSize:13,fontWeight:700,background:'#6366F1',color:'white',border:'none',cursor:'pointer'}}>{t.label}</button>)}
+      </div>
+    </div>
+  );
+}
+
+/* ── Run: Dashboard Module ── */
+function RunDashModule({config,context,def,currentStateId,availTrans,onTransition}){
+  const columns=config.columns||[];
+  const titleKey=config.cardTitleKey;
+  return(
+    <div>
+      <h3 style={{fontSize:17,fontWeight:800,color:'#1E293B',marginBottom:12}}>{config.title}</h3>
+      <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:8}}>
+        {(columns.length>0?columns:def.states.map(s=>({value:s.id,label:s.label}))).map(col=>{
+          const isCurrent=currentStateId===col.value;
+          return(
+            <div key={col.value} style={{flexShrink:0,width:160}}>
+              <div style={{background:'#F1F5F9',borderRadius:'8px 8px 0 0',padding:'7px 12px',fontSize:11,fontWeight:700,color:'#475569'}}>{col.label}</div>
+              <div style={{background:'#F8FAFC',borderRadius:'0 0 8px 8px',border:'1px solid #E2E8F0',borderTop:'none',minHeight:80,padding:8}}>
+                {isCurrent?(
+                  <div style={{background:'white',border:'2px solid #6366F1',borderRadius:8,padding:'10px 12px',boxShadow:'0 2px 8px rgba(99,102,241,.15)'}}>
+                    <div style={{fontSize:11,fontWeight:700,color:'#1E293B'}}>{String(context[titleKey]||'현재 인스턴스')}</div>
+                    <div style={{fontSize:10,color:'#6366F1',marginTop:2}}>현재 위치</div>
+                  </div>
+                ):<div style={{fontSize:10,color:'#CBD5E1',textAlign:'center',padding:'16px 0'}}>없음</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {availTrans.length>0&&(
+        <div style={{display:'flex',gap:8,marginTop:16}}>
+          {availTrans.map(t=><button key={t.id} onClick={()=>onTransition(t.id)} style={{padding:'9px 20px',borderRadius:9,fontSize:13,fontWeight:700,background:'#6366F1',color:'white',border:'none',cursor:'pointer'}}>{t.label}</button>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Run: Module Router ── */
+function RunModule({stateDef,def,context,currentStateId,availTrans,allOutTrans,onContextUpdate,onTransition,onComplete}){
+  const{type,config}=stateDef.module;
+  // approval은 조건 평가 전 사용자가 결과를 결정하므로 allOutTrans 사용
+  const transList = type==='approval' ? allOutTrans : availTrans;
+  const props={config,context,availTrans:transList,onContextUpdate,onTransition,onComplete};
+  switch(type){
+    case 'form':         return <RunFormModule {...props}/>;
+    case 'approval':     return <RunApprovalModule {...props}/>;
+    case 'notification': return <RunNotifModule {...props}/>;
+    case 'document-gen': return <RunDocGenModule {...props}/>;
+    case 'dashboard':    return <RunDashModule {...props} def={def} currentStateId={currentStateId}/>;
+    default: return <div style={{color:'#94A3B8',fontSize:12}}>알 수 없는 모듈: {type}</div>;
+  }
+}
+
+/* ── Run: Toast ── */
+function RunToasts({toasts,onDismiss}){
+  const colors={info:'#3B82F6',success:'#10B981',warning:'#F59E0B',error:'#EF4444'};
+  return(
+    <div style={{position:'absolute',bottom:16,right:16,display:'flex',flexDirection:'column',gap:8,zIndex:10,pointerEvents:'none'}}>
+      {toasts.map(t=>(
+        <div key={t.id} className="run-toast" style={{background:colors[t.level]||'#475569',color:'white',padding:'10px 16px',borderRadius:10,fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:10,boxShadow:'0 4px 16px rgba(0,0,0,.2)',pointerEvents:'auto',maxWidth:320}}>
+          <span style={{flex:1}}>{t.msg}</span>
+          <button onClick={()=>onDismiss(t.id)} style={{background:'none',border:'none',color:'rgba(255,255,255,.7)',cursor:'pointer',fontSize:16,lineHeight:1}}>×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── TEST RUN PANEL (Main) ── */
+function TestRunPanel({processDef,onClose}){
+  const[stateId,setStateId]=useState(processDef.initialState||processDef.states[0]?.id);
+  const[context,setContext]=useState({});
+  const[toasts,setToasts]=useState([]);
+  const[done,setDone]=useState(false);
+  let toastSeq=0;
+
+  const stateDef=processDef.states.find(s=>s.id===stateId);
+  const availTrans=getAvailTrans(processDef,stateId,context);
+  const allOutTrans=(processDef.transitions||[]).filter(t=>t.from===stateId);
+
+  function addToast(msg,level='info'){
+    const id=`rt-${++toastSeq}`;
+    setToasts(p=>[...p,{id,msg,level}]);
+    setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500);
+  }
+  function handleContextUpdate(patch){setContext(p=>({...p,...patch}));}
+  function handleTransition(tId){
+    const t=processDef.transitions.find(tr=>tr.id===tId);if(!t)return;
+    const next=processDef.states.find(s=>s.id===t.to);if(!next)return;
+    setStateId(t.to);
+    addToast(`${t.label} → ${next.label}`,'success');
+    if(next.terminal) setDone(true);
+  }
+  function reset(){setStateId(processDef.initialState||processDef.states[0]?.id);setContext({});setToasts([]);setDone(false);}
+
+  const def=MOD[stateDef?.module?.type]||MOD.form;
+
+  return(
+    <div className="run-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="run-modal">
+        {/* Header */}
+        <div style={{padding:'16px 20px',borderBottom:'1px solid #E2E8F0',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+          <span style={{fontSize:20}}>{processDef.icon}</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:'#1E293B'}}>{processDef.name}</div>
+            <div style={{fontSize:11,color:'#94A3B8'}}>테스트 실행 — 실제 데이터는 저장되지 않습니다</div>
+          </div>
+          <button onClick={reset} style={{padding:'6px 12px',borderRadius:7,fontSize:11,fontWeight:700,background:'#F1F5F9',border:'1.5px solid #CBD5E1',color:'#475569',cursor:'pointer'}}>🔄 초기화</button>
+          <button onClick={onClose} style={{padding:'6px 10px',borderRadius:7,fontSize:16,background:'none',border:'none',color:'#94A3B8',cursor:'pointer'}}>✕</button>
+        </div>
+
+        {/* Step Nav */}
+        <RunStepNav def={processDef} currentStateId={stateId}/>
+
+        {/* Module content */}
+        <div style={{flex:1,overflow:'auto',padding:24,position:'relative'}}>
+          {done?(
+            <div style={{textAlign:'center',padding:'32px 0'}}>
+              <div style={{fontSize:48,marginBottom:12}}>🎉</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#1E293B',marginBottom:6}}>프로세스 완료!</div>
+              <div style={{fontSize:13,color:'#64748B',marginBottom:24}}>모든 단계가 완료되었습니다.</div>
+              <button onClick={reset} style={{padding:'10px 24px',borderRadius:10,fontSize:14,fontWeight:700,background:'#6366F1',color:'white',border:'none',cursor:'pointer'}}>🔄 다시 실행</button>
+            </div>
+          ):stateDef?(
+            <div style={{background:'white',borderRadius:14,border:`2px solid ${def.bdr}`,padding:24,boxShadow:`0 4px 20px ${def.color}15`}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:18,paddingBottom:14,borderBottom:'1px solid #F1F5F9'}}>
+                <div style={{width:32,height:32,borderRadius:8,background:`${def.color}1A`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>{def.icon}</div>
+                <div style={{fontSize:11,color:def.color,fontWeight:700}}>{stateDef.label} · {def.label}</div>
+              </div>
+              <RunModule
+                stateDef={stateDef} def={processDef}
+                context={context} currentStateId={stateId}
+                availTrans={availTrans} allOutTrans={allOutTrans}
+                onContextUpdate={handleContextUpdate}
+                onTransition={handleTransition}
+                onComplete={()=>{const auto=allOutTrans.find(t=>t.trigger==='auto');if(auto)handleTransition(auto.id);}}
+              />
+            </div>
+          ):(
+            <div style={{textAlign:'center',color:'#94A3B8',padding:'32px 0'}}>초기 상태가 설정되지 않았습니다.</div>
+          )}
+          <RunToasts toasts={toasts} onDismiss={id=>setToasts(p=>p.filter(t=>t.id!==id))}/>
+        </div>
+
+        {/* Context debug footer */}
+        {Object.keys(context).length>0&&(
+          <div style={{borderTop:'1px solid #E2E8F0',padding:'8px 20px',background:'#F8FAFC',flexShrink:0}}>
+            <div style={{fontSize:9,fontWeight:800,color:'#94A3B8',textTransform:'uppercase',letterSpacing:.7,marginBottom:4}}>현재 컨텍스트</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {Object.entries(context).map(([k,v])=>(
+                <div key={k} style={{fontSize:10,padding:'2px 8px',borderRadius:5,background:'white',border:'1px solid #E2E8F0',color:'#475569'}}>
+                  <span style={{color:'#94A3B8'}}>{k}:</span> <span style={{fontWeight:700,color:'#1E293B'}}>{String(v).slice(0,30)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════
+   LEFT PANEL
+   ═══════════════════════════════════ */
+function LeftPanel(){
+  const s=useStore();const{processes,activeId}=s;
+  return(
+    <div style={{width:210,minWidth:210,background:'#1E293B',display:'flex',flexDirection:'column',overflow:'hidden',borderRight:'1px solid #0F172A'}}>
+      <div style={{padding:'15px 16px 12px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+        <div style={{color:'#F1F5F9',fontWeight:800,fontSize:13}}>⚙️ Process Designer</div>
+        <div style={{color:'#64748B',fontSize:10,marginTop:2}}>업무 프로세스 설계 도구</div>
+      </div>
+      <div style={{flex:1,overflow:'auto',padding:'10px 8px 0'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 4px',marginBottom:6}}>
+          <span style={{fontSize:9,fontWeight:800,color:'#475569',letterSpacing:.8,textTransform:'uppercase'}}>프로세스</span>
+          <button onClick={()=>s.newProcess()} style={{fontSize:10,fontWeight:700,color:'#818CF8',background:'none',border:'none',cursor:'pointer',padding:'2px 5px'}}>+ 새로만들기</button>
+        </div>
+        {processes.length===0&&<div style={{fontSize:11,color:'#334155',textAlign:'center',padding:'20px 0'}}>프로세스 없음</div>}
+        {processes.map(p=>(
+          <div key={p.id} style={{marginBottom:3}}>
+            <div onClick={()=>s.setActive(p.id)} style={{padding:'8px 10px',borderRadius:8,cursor:'pointer',background:activeId===p.id?'rgba(99,102,241,.22)':'transparent',border:`1.5px solid ${activeId===p.id?'#6366F1':'transparent'}`,transition:'.12s'}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#F1F5F9',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.icon} {p.name}</div>
+              <div style={{fontSize:10,color:'#475569',marginTop:1}}>{p.states.length}단계 · v{p.version}</div>
+            </div>
+            {activeId===p.id&&(
+              <div style={{display:'flex',gap:4,padding:'2px 4px 4px'}}>
+                {[['📋',()=>s.dupProcess(p.id)],['🗑',()=>{if(confirm('삭제?'))s.deleteProcess(p.id);}]].map(([lbl,fn])=>(
+                  <button key={lbl} onClick={fn} style={{flex:1,fontSize:10,padding:'4px 0',borderRadius:5,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',color:'#94A3B8',cursor:'pointer'}}>{lbl}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{height:1,background:'rgba(255,255,255,.08)',margin:'0 8px'}}/>
+      <div style={{padding:'10px 8px 12px'}}>
+        <div style={{fontSize:9,fontWeight:800,color:'#475569',letterSpacing:.8,textTransform:'uppercase',marginBottom:6,paddingLeft:4}}>모듈 팔레트 — 드래그</div>
+        {Object.entries(MOD).map(([type,def])=>(
+          <div key={type} draggable onDragStart={e=>e.dataTransfer.setData('moduleType',type)}
+            style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,marginBottom:4,cursor:'grab',background:`${def.color}14`,border:`1.5px solid ${def.color}35`}}>
+            <span style={{fontSize:15}}>{def.icon}</span>
+            <span style={{fontSize:11,fontWeight:700,color:def.color}}>{def.label}</span>
+          </div>
+        ))}
+        <button onClick={()=>s.autoArrange()} style={{width:'100%',marginTop:6,padding:'7px',borderRadius:8,cursor:'pointer',background:'rgba(99,102,241,.14)',border:'1.5px solid rgba(99,102,241,.28)',color:'#818CF8',fontSize:11,fontWeight:700}}>✦ 자동 정렬</button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════
+   RIGHT PANEL
+   ═══════════════════════════════════ */
+function RightPanel(){
+  const s=useStore();const active=s.getActive();
+  const{selectedNodeId,selectedTransId,rTab}=s;
+  const selNodeObj =active?.states.find(n=>n.id===selectedNodeId);
+  const selTransObj=active?.transitions.find(t=>t.id===selectedTransId);
+  return(
+    <div style={{width:300,minWidth:300,background:'#fff',borderLeft:'1px solid #E2E8F0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{display:'flex',borderBottom:'1px solid #E2E8F0',flexShrink:0}}>
+        {[['config','⚙ 속성'],['json','{ } JSON']].map(([tab,label])=>(
+          <button key={tab} onClick={()=>s.setRTab(tab)} style={{flex:1,padding:'10px 0',fontSize:12,fontWeight:700,border:'none',cursor:'pointer',background:rTab===tab?'#fff':'#F8FAFC',color:rTab===tab?'#6366F1':'#64748B',borderBottom:`2px solid ${rTab===tab?'#6366F1':'transparent'}`}}>{label}</button>
+        ))}
+      </div>
+      <div style={{flex:1,overflow:'auto'}}>
+        {rTab==='json'?<JsonPanel s={s} active={active}/>:<ConfigPanel s={s} active={active} node={selNodeObj} trans={selTransObj}/>}
+      </div>
+    </div>
+  );
+}
+
+function ConfigPanel({s,active,node,trans}){
+  if(!active)return(<div style={{padding:24,textAlign:'center',color:'#94A3B8'}}><div style={{fontSize:36,marginBottom:8}}>👈</div><p style={{fontSize:12}}>좌측에서 프로세스를 선택하세요</p></div>);
+  if(node)  return<NodePanel s={s} active={active} node={node}/>;
+  if(trans) return<TransPanel s={s} active={active} trans={trans}/>;
+  return<MetaPanel s={s} active={active}/>;
+}
+
+function MetaPanel({s,active}){
+  const ctxVars=collectContextVars(active);
+  return(
+    <div style={{padding:16}}>
+      <SectionLabel>프로세스 설정</SectionLabel>
+      <Field label="이름"><input className="pp-input" value={active.name} onChange={e=>s.updateMeta({name:e.target.value})}/></Field>
+      <Field label="아이콘"><input className="pp-input" style={{width:60}} value={active.icon} onChange={e=>s.updateMeta({icon:e.target.value})}/></Field>
+      <Field label="설명"><textarea className="pp-input" rows={2} style={{resize:'vertical'}} value={active.description} onChange={e=>s.updateMeta({description:e.target.value})}/></Field>
+      <Field label="버전"><input className="pp-input" value={active.version} onChange={e=>s.updateMeta({version:e.target.value})}/></Field>
+      <div style={{marginTop:12,padding:'10px 12px',background:'#F8FAFC',border:'1.5px solid #E2E8F0',borderRadius:9,fontSize:11,color:'#475569',lineHeight:1.7}}>
+        <div>📐 {active.states.length}단계 · {active.transitions.length}전이</div>
+        <div>🚀 시작: <b>{active.states.find(s2=>s2.id===active.initialState)?.label??'(미설정)'}</b></div>
+      </div>
+      {ctxVars.length>0&&(
+        <div style={{marginTop:12}}>
+          <SectionLabel>컨텍스트 변수 ({ctxVars.length})</SectionLabel>
+          <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+            {ctxVars.map(v=><div key={v.key} style={{fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:5,background:'#EEF2FF',border:'1.5px solid #C7D2FE',color:'#4338CA'}}>{v.key} <span style={{fontWeight:400,color:'#818CF8'}}>({v.type})</span></div>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NodePanel({s,active,node}){
+  const def=MOD[node.module.type]||MOD.form;
+  const isInit=active.initialState===node.id;
+  const[showMod,setShowMod]=useState(true);
+  const connTrans=active.transitions.filter(t=>t.from===node.id||t.to===node.id);
+  return(
+    <div style={{padding:16}}>
+      <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:14}}>
+        <div style={{width:34,height:34,borderRadius:9,background:`${def.color}1A`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{def.icon}</div>
+        <div style={{flex:1,minWidth:0}}><SectionLabel style={{margin:0}}>노드 설정</SectionLabel><div style={{fontSize:11,color:def.color,fontWeight:700,marginTop:1}}>{def.label} 모듈</div></div>
+      </div>
+      <Field label="단계 이름"><input className="pp-input" value={node.label} onChange={e=>s.updateNode(node.id,{label:e.target.value})}/></Field>
+      <div style={{display:'flex',gap:7,marginBottom:14}}>
+        <Tog active={isInit} color="#6366F1" onClick={()=>s.setInitial(node.id)}>{isInit?'✓ 시작점':'시작점 설정'}</Tog>
+        <Tog active={node.terminal} color="#059669" onClick={()=>s.toggleTerminal(node.id)}>{node.terminal?'✓ 종료점':'종료점 설정'}</Tog>
+      </div>
+      <div style={{borderTop:'1.5px solid #E2E8F0',paddingTop:14}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10,cursor:'pointer'}} onClick={()=>setShowMod(!showMod)}>
+          <SectionLabel style={{marginBottom:0}}>{def.icon} {def.label} 설정</SectionLabel>
+          <span style={{fontSize:11,color:'#94A3B8'}}>{showMod?'▾':'▸'}</span>
+        </div>
+        {showMod&&<ModuleConfigEditor node={node} active={active} s={s}/>}
+      </div>
+      {connTrans.length>0&&(
+        <div style={{borderTop:'1.5px solid #E2E8F0',paddingTop:14,marginTop:14}}>
+          <SectionLabel>연결된 전이 ({connTrans.length})</SectionLabel>
+          {connTrans.map(t=>{const isOut=t.from===node.id;const other=active.states.find(n=>n.id===(isOut?t.to:t.from));return(
+            <div key={t.id} onClick={()=>s.selectTrans(t.id)} style={{padding:'6px 10px',borderRadius:7,marginBottom:4,background:'#F8FAFC',border:'1.5px solid #E2E8F0',fontSize:11,display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+              <span style={{color:isOut?'#2563EB':'#DC2626',fontSize:13,fontWeight:800}}>{isOut?'→':'←'}</span>
+              <span style={{fontWeight:700,color:'#1E293B',flex:1}}>{t.label}</span>
+              <span style={{color:'#94A3B8'}}>{other?.label??'?'}</span>
+            </div>
+          );})}
+        </div>
+      )}
+      <DangerBtn onClick={()=>{if(confirm('노드를 삭제할까요?'))s.deleteNode(node.id);}} style={{marginTop:16}}>🗑 노드 삭제</DangerBtn>
+    </div>
+  );
+}
+
+function TransPanel({s,active,trans}){
+  const fromNode=active.states.find(n=>n.id===trans.from);
+  const toNode  =active.states.find(n=>n.id===trans.to);
+  const ctxVars=collectContextVars(active);
+  return(
+    <div style={{padding:16}}>
+      <SectionLabel>전이 설정</SectionLabel>
+      <div style={{padding:'10px',background:'#F8FAFC',border:'1.5px solid #E2E8F0',borderRadius:9,marginBottom:14,fontSize:11}}>
+        <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontWeight:700,color:'#1E293B'}}>{fromNode?.label??'?'}</span><span style={{color:'#6366F1',fontWeight:800,fontSize:13}}>→</span><span style={{fontWeight:700,color:'#1E293B'}}>{toNode?.label??'?'}</span></div>
+      </div>
+      <Field label="버튼 레이블"><input className="pp-input" value={trans.label} onChange={e=>s.updateTrans(trans.id,{label:e.target.value})}/></Field>
+      <Field label="트리거">
+        <select className="pp-input" value={trans.trigger} onChange={e=>s.updateTrans(trans.id,{trigger:e.target.value})}>
+          <option value="manual">manual — 사용자 버튼 클릭</option>
+          <option value="auto">auto — 모듈 완료 시 자동</option>
+        </select>
+      </Field>
+      <Field label="실행 조건">
+        <ConditionEditor condition={trans.condition} onChange={c=>s.updateTrans(trans.id,{condition:c})} ctxVars={ctxVars}/>
+      </Field>
+      <DangerBtn onClick={()=>{if(confirm('전이를 삭제할까요?'))s.deleteTrans(trans.id);}}>🗑 전이 삭제</DangerBtn>
+    </div>
+  );
+}
+
+function JsonPanel({s,active}){
+  const[copied,setCopied]=useState(false);
+  const json=s.getJSON();
+  function copy(){navigator.clipboard.writeText(json).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});}
+  function dl(){if(!active)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.download=`${active.name||'process'}.json`;a.click();}
+  function imp(){const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const data=JSON.parse(ev.target.result);const id=uid('proc');const layout=data._layout||{};if(!Object.keys(layout).length)(data.states||[]).forEach((s,i)=>{layout[s.id]={x:80+i*(NW+80),y:200};});useStore.setState(st=>({processes:[...st.processes,{...data,id,_layout:layout}],activeId:id}));}catch(err){alert('파싱 오류: '+err.message);}};r.readAsText(f);};inp.click();}
+  return(
+    <div style={{padding:12,display:'flex',flexDirection:'column',height:'100%'}}>
+      <div style={{display:'flex',gap:5,marginBottom:10}}>
+        {[[copy,copied?'✓ 복사':'📋 복사','#EEF2FF','#818CF8','#4F46E5'],[dl,'💾 저장','#D1FAE5','#6EE7B7','#059669'],[imp,'📂 불러오기','#F1F5F9','#CBD5E1','#475569']].map(([fn,lbl,bg,bdr,clr])=>(
+          <button key={lbl} onClick={fn} style={{flex:1,padding:'6px 0',borderRadius:7,fontSize:10,fontWeight:700,background:bg,border:`1.5px solid ${bdr}`,color:clr,cursor:'pointer'}}>{lbl}</button>
+        ))}
+      </div>
+      {!active?<div style={{color:'#94A3B8',fontSize:12,textAlign:'center',padding:20}}>프로세스를 선택하세요</div>
+        :<pre style={{flex:1,overflow:'auto',fontSize:10,lineHeight:1.65,background:'#0F172A',color:'#94A3B8',padding:12,borderRadius:9,fontFamily:'monospace',whiteSpace:'pre-wrap',wordBreak:'break-all',margin:0}}>{json}</pre>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════
+   TOOLBAR
+   ═══════════════════════════════════ */
+function Toolbar({s}){
+  const active=s.getActive();
+  return(
+    <div style={{height:46,background:'#fff',borderBottom:'1px solid #E2E8F0',display:'flex',alignItems:'center',padding:'0 18px',gap:10,flexShrink:0}}>
+      {active?(
+        <>
+          <span style={{fontSize:18}}>{active.icon}</span>
+          <span style={{fontSize:14,fontWeight:700,color:'#1E293B'}}>{active.name}</span>
+          <span style={{fontSize:11,color:'#94A3B8',background:'#F1F5F9',padding:'2px 7px',borderRadius:5}}>v{active.version}</span>
+          <div style={{flex:1}}/>
+          <span style={{fontSize:11,color:'#94A3B8'}}>{active.states.length}단계 · {active.transitions.length}전이</span>
+          <TBtn onClick={()=>s.autoArrange()}>✦ 자동 정렬</TBtn>
+          <TBtn onClick={()=>s.setTestRun(true)} color="green">▶ 테스트 실행</TBtn>
+          <TBtn onClick={()=>s.newProcess()} color="indigo">+ 새 프로세스</TBtn>
+        </>
+      ):(
+        <><span style={{fontSize:13,fontWeight:700,color:'#94A3B8'}}>Process Designer</span><div style={{flex:1}}/><TBtn onClick={()=>s.newProcess()} color="indigo">+ 새 프로세스</TBtn></>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════ */
+function SectionLabel({children,style={}}){return<div style={{fontSize:10,fontWeight:800,color:'#64748B',textTransform:'uppercase',letterSpacing:.7,marginBottom:8,...style}}>{children}</div>;}
+function Field({label,children}){return(<div style={{marginBottom:10}}><label style={{display:'block',fontSize:11,fontWeight:700,color:'#475569',marginBottom:4}}>{label}</label>{children}</div>);}
+function Tog({active,color,onClick,children}){return(<button onClick={onClick} style={{flex:1,padding:'6px 4px',borderRadius:7,fontSize:10,fontWeight:700,border:`1.5px solid ${active?color:'#E2E8F0'}`,background:active?`${color}15`:'#F8FAFC',color:active?color:'#64748B',cursor:'pointer'}}>{children}</button>);}
+function DangerBtn({onClick,children,style={}}){return(<button onClick={onClick} style={{width:'100%',padding:'8px',borderRadius:8,fontSize:12,fontWeight:700,background:'#FEF2F2',color:'#DC2626',border:'1.5px solid #FCA5A5',cursor:'pointer',...style}}>{children}</button>);}
+function TBtn({onClick,children,color}){
+  const c=color==='indigo'?{bg:'#6366F1',bdr:'#6366F1',clr:'#fff'}:color==='green'?{bg:'#10B981',bdr:'#10B981',clr:'#fff'}:{bg:'#EEF2FF',bdr:'#818CF8',clr:'#4F46E5'};
+  return(<button onClick={onClick} style={{padding:'6px 14px',borderRadius:7,fontSize:12,fontWeight:700,background:c.bg,border:`1.5px solid ${c.bdr}`,color:c.clr,cursor:'pointer'}}>{children}</button>);
+}
+const iconBtn={background:'none',border:'none',cursor:'pointer',fontSize:10,color:'#94A3B8',padding:'1px 3px'};
+const addBtn={fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,background:'#EEF2FF',border:'1.5px solid #818CF8',color:'#4F46E5',cursor:'pointer'};
+
+/* ═══════════════════════════════════
+   APP ROOT
+   ═══════════════════════════════════ */
+function App(){
+  const s=useStore();
+  const wrapRef=useRef(null);
+  const active=s.getActive();
+  return(
+    <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
+      <LeftPanel/>
+      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
+        <Toolbar s={s}/>
+        <Canvas wrapRef={wrapRef}/>
+      </div>
+      <RightPanel/>
+      {s.testRunOpen&&active&&(
+        <TestRunPanel processDef={{...active}} onClose={()=>s.setTestRun(false)}/>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
