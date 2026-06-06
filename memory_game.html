@@ -325,11 +325,45 @@
     text-decoration: none;
     backdrop-filter: blur(4px);
   }
+
+  /* 홈 이탈 확인 팝업 */
+  #confirm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    align-items: center; justify-content: center; z-index: 200;
+  }
+  #confirm-overlay.show { display: flex; }
+  .confirm-box {
+    background: #16213e; border: 2px solid #e94560;
+    border-radius: 20px; padding: 28px 24px;
+    text-align: center; width: 88%; max-width: 300px;
+  }
+  .confirm-box h3 { font-size: 20px; margin-bottom: 8px; }
+  .confirm-box p  { font-size: 14px; color: #aaa; margin-bottom: 20px; }
+  .confirm-btns  { display: flex; gap: 10px; }
+  .confirm-btns button {
+    flex: 1; padding: 12px; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: bold; cursor: pointer;
+  }
+  .confirm-stay { background: rgba(255,255,255,0.1); color: white; }
+  .confirm-exit { background: #e94560; color: white; }
 </style>
 </head>
 <body>
 
-<a id="home-btn" href="index.html">🏠 홈</a>
+
+<div id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>🏠 게임을 나가시겠어요?</h3>
+    <p>현재 게임 진행상황은 저장되지 않아요</p>
+    <div class="confirm-btns">
+      <button class="confirm-stay" onclick="closeConfirm()">계속 하기</button>
+      <button class="confirm-exit" onclick="location.href='index.html'">나가기</button>
+    </div>
+  </div>
+</div>
+
+<a id="home-btn" href="#" onclick="confirmHome(event)">🏠 홈</a>
 <h1>🧠 메모리 게임</h1>
 
 <div class="hud">
@@ -473,7 +507,7 @@ document.addEventListener('click', e => {
   }
 });
 
-// 이름 선택 버튼
+// 이름 선택 버튼 (이름 이미 저장된 경우 바로 저장)
 document.querySelectorAll('.name-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (!pendingResult) return;
@@ -620,7 +654,18 @@ function gameComplete() {
   document.getElementById('res-moves').textContent = moves;
   document.getElementById('res-grade').textContent = grade;
 
+  // localStorage에 이름 저장되어 있으면 이름 선택 스킵
+  const savedName = localStorage.getItem('gameName');
   setTimeout(() => {
+    if (savedName) {
+      saveMemRanking(savedName, pendingResult);
+      document.getElementById('page-name').style.display = 'none';
+      renderRanking(level);
+      document.getElementById('page-ranking').style.display = 'flex';
+    } else {
+      document.getElementById('page-name').style.display = 'flex';
+      document.getElementById('page-ranking').style.display = 'none';
+    }
     document.getElementById('overlay').classList.add('show');
   }, 400);
 }
@@ -635,6 +680,15 @@ function formatTime(s) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return m > 0 ? `${m}:${String(sec).padStart(2,'0')}` : `${sec}s`;
+}
+
+
+function confirmHome(e) {
+  e.preventDefault();
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('show');
 }
 
 // 시작
