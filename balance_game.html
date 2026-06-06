@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>⚖️ 밸런스 스택</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:#0a0a1a; font-family:Arial,sans-serif; user-select:none; -webkit-tap-highlight-color:transparent; }
+canvas { display:block; }
+
+#hud { position:fixed; top:0; left:0; right:0; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; z-index:5; }
+#score { color:#fff; font-size:30px; font-weight:bold; }
+#bal-box { display:flex; flex-direction:column; align-items:center; gap:5px; }
+#bal-label { font-size:10px; color:#555; letter-spacing:2px; }
+#bal-track { width:100px; height:6px; background:rgba(255,255,255,0.08); border-radius:3px; position:relative; }
+#bal-knob { position:absolute; top:50%; width:14px; height:14px; border-radius:50%; background:#4ade80; border:2px solid #0a0a1a; transform:translate(-50%,-50%); transition:background .2s; left:50%; }
+
+#btn-area { position:fixed; bottom:0; left:0; right:0; height:110px; display:flex; align-items:center; justify-content:center; z-index:5; }
+#drop { width:160px; height:52px; border:none; border-radius:26px; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; font-size:18px; font-weight:bold; letter-spacing:3px; cursor:pointer; box-shadow:0 0 30px rgba(139,92,246,.5); transition:transform .1s; }
+#drop:active { transform:scale(.93); }
+
+#ov { position:fixed; inset:0; background:rgba(0,0,0,.85); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:20; gap:8px; }
+#ov.on { display:flex; }
+#ov-icon  { font-size:60px; }
+#ov-title { color:#fff; font-size:32px; font-weight:bold; }
+#ov-score { color:#a78bfa; font-size:22px; }
+#ov-best  { color:#444; font-size:14px; margin-bottom:24px; }
+#retry    { padding:14px 44px; border:none; border-radius:24px; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; font-size:18px; font-weight:bold; cursor:pointer; margin-bottom:10px; }
+#hub-btn  { color:#555; font-size:14px; background:none; border:none; cursor:pointer; text-decoration:underline; pointer-events:all; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div id="score">0</div>
+  <div id="bal-box">
+    <div id="bal-label">BALANCE</div>
+    <div id="bal-track"><div id="bal-knob"></div></div>
+  </div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="btn-area"><button id="drop">DROP</button></div>
+
+<div id="ov">
+  <div id="ov-icon">⚖️</div>
+  <div id="ov-title">무너짐!</div>
+  <div id="ov-score"></div>
+  <div id="ov-best"></div>
+  <button id="retry">다시하기</button>
+  <button id="hub-btn" onclick="location.href='index.html'">← 게임 허브</button>
+</div>
+
+<script>
+const cv = document.getElementById('c');
+const cx = cv.getContext('2d');
+
+// roundRect polyfill
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {
+    r = Math.min(r, w/2, h/2);
+    this.beginPath();
+    this.moveTo(x+r,y); this.lineTo(x+w-r,y); this.arcTo(x+w,y,x+w,y+r,r);
+    this.lineTo(x+w,y+h-r); this.arcTo(x+w,y+h,x+w-r,y+h,r);
+    this.lineTo(x+r,y+h); this.arcTo(x,y+h,x,y+h-r,r);
+    this.lineTo(x,y+r); this.arcTo(x,y,x+r,y,r);
+    this.closePath(); return this;
+  };
+}
+
+let W, H;
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ── 상수
+const BH      = 20;    // 바 높이
+const GAP     = 3;     // 바 사이 간격
+const BASE_W  = 180;   // 초기 바 너비
+const BOT     = 110;   // 하단 버튼 영역
+const MOVER_Y = 68;    // 이동 바 Y 위치
+const DROP_MS = 300;   // 낙하 애니메이션 시간
+const MAX_TILT = 40;   // 최대 기울기(도)
+const PALETTE = [
+  ['#f43f5e','#fb7185'], ['#f97316','#fb923c'], ['#eab308','#fbbf24'],
+  ['#22c55e','#34d399'], ['#06b6d4','#22d3ee'], ['#6366f1','#818cf8'],
+  ['#a855f7','#c084fc'], ['#ec4899','#f9a8d4'],
+];
+
+// ── 상태
+let stack, mv, dp, score, tilt, cam, best, phase;
+best = +localStorage.getItem('bstack_best') || 0;
+
+const playerName = localStorage.getItem('gameName') || '';
+
+function col(i) { return PALETTE[i % PALETTE.length]; }
+
+// 스택 i번째 바의 top-y
+function barY(i) { return H - BOT - (i + 1) * (BH + GAP) + cam; }
+// 다음 바가 착지할 y
+function landY()  { return barY(stack.length); }
+
+function getBalance() {
+  let sw = 0, sm = 0;
+  for (const b of stack) { sw += b.w; sm += b.cx * b.w; }
+  return (sm / sw - stack[0].cx) / (stack[0].w / 2);
+}
+
+function updateCam() {
+  const n = stack.length;
+  const naturalTop = H - BOT - n * (BH + GAP);
+  cam = Math.max(0, H * 0.35 - naturalTop);
+}
+
+function resetMv() {
+  const top = stack[stack.length - 1];
+  mv = { cx: W / 2, w: Math.max(top.w, 16), dir: 1, spd: 1.8 + score * 0.07 };
+}
+
+function start() {
+  stack = [{ cx: W / 2, w: BASE_W, color: col(0) }];
+  dp = null; tilt = 0; cam = 0; score = 0; phase = 'play';
+  resetMv();
+  updateHUD();
+}
+
+function tap() {
+  if (phase !== 'play') return;
+  phase = 'drop';
+
+  const top = stack[stack.length - 1];
+  const mL = mv.cx - mv.w / 2, mR = mv.cx + mv.w / 2;
+  const tL = top.cx - top.w / 2, tR = top.cx + top.w / 2;
+  const oL = Math.max(mL, tL), oR = Math.min(mR, tR);
+  const oW = oR - oL;
+  const nc  = col(stack.length);
+  const toY = landY();
+
+  if (oW <= 2) {
+    dp = { cx: mv.cx, w: mv.w, color: nc, fromY: MOVER_Y, toY: H + 100,
+           t0: performance.now(), miss: true };
+    setTimeout(() => over('miss'), 550);
+    return;
+  }
+
+  let trCx = null, trW = 0, trDir = 0;
+  if (mv.cx > top.cx)      { trCx = (oR + mR) / 2; trW = mR - oR; trDir =  1; }
+  else if (mv.cx < top.cx) { trCx = (mL + oL) / 2; trW = oL - mL; trDir = -1; }
+
+  dp = { cx: (oL + oR) / 2, w: oW, color: nc,
+         fromY: MOVER_Y, toY, t0: performance.now(),
+         miss: false, trCx, trW, trDir };
+}
+
+function land() {
+  const d = dp;
+  stack.push({ cx: d.cx, w: d.w, color: d.color });
+  score++;
+
+  const b = getBalance();
+  tilt = b * MAX_TILT;
+
+  if (Math.abs(b) >= 1.0 || d.w < 8) { over('balance'); return; }
+
+  updateCam();
+  dp = null;
+  resetMv();
+  phase = 'play';
+  updateHUD();
+}
+
+function over(why) {
+  phase = 'dead';
+  if (score > best) {
+    best = score;
+    localStorage.setItem('bstack_best', best);
+    // 랭킹 저장
+    try {
+      const key = 'bstack_rank';
+      const ranks = JSON.parse(localStorage.getItem(key) || '[]');
+      ranks.push({ name: playerName || '?', score, date: new Date().toLocaleDateString('ko-KR') });
+      ranks.sort((a, b) => b.score - a.score);
+      localStorage.setItem(key, JSON.stringify(ranks.slice(0, 10)));
+    } catch(e) {}
+  }
+  document.getElementById('ov-icon').textContent  = why === 'miss' ? '😱' : '⚖️';
+  document.getElementById('ov-title').textContent  = why === 'miss' ? '놓쳤다!' : '무너짐!';
+  document.getElementById('ov-score').textContent  = '점수: ' + score;
+  document.getElementById('ov-best').textContent   = '최고: ' + best;
+  document.getElementById('ov').classList.add('on');
+}
+
+function updateHUD() {
+  document.getElementById('score').textContent = score;
+  const b   = Math.max(-1, Math.min(1, getBalance()));
+  const pct = ((b + 1) / 2) * 100;
+  const k   = document.getElementById('bal-knob');
+  k.style.left = Math.max(7, Math.min(93, pct)) + '%';
+  const a   = Math.abs(b);
+  k.style.background = a > 0.7 ? '#f43f5e' : a > 0.4 ? '#fbbf24' : '#4ade80';
+}
+
+// ── 그리기
+function drawBar(bx, by, bw, bh, c, alpha) {
+  if (bw < 1) return;
+  cx.save();
+  if (alpha !== undefined) cx.globalAlpha = alpha;
+  const [c1, c2] = c;
+  const g = cx.createLinearGradient(bx - bw/2, by, bx - bw/2, by + bh);
+  g.addColorStop(0, c1); g.addColorStop(1, c2);
+  cx.fillStyle = g;
+  cx.beginPath(); cx.roundRect(bx - bw/2, by, bw, bh, 5); cx.fill();
+  cx.fillStyle = 'rgba(255,255,255,.15)';
+  cx.beginPath(); cx.roundRect(bx - bw/2 + 3, by + 3, Math.max(1, bw - 6), 4, 2); cx.fill();
+  cx.restore();
+}
+
+function draw(ts) {
+  cx.clearRect(0, 0, W, H);
+
+  const bg = cx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#080814'); bg.addColorStop(1, '#0f172a');
+  cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
+
+  // 스택 (기울기 적용)
+  const pivX = stack[0].cx;
+  const pivY = barY(0) + BH;
+  cx.save();
+  cx.translate(pivX, pivY);
+  cx.rotate(tilt * Math.PI / 180);
+  cx.translate(-pivX, -pivY);
+  for (let i = 0; i < stack.length; i++) {
+    const b = stack[i];
+    drawBar(b.cx, barY(i), b.w, BH, b.color);
+  }
+  cx.restore();
+
+  // 낙하 중인 바 (기울기 없음)
+  if (dp) {
+    const t    = Math.min((ts - dp.t0) / DROP_MS, 1);
+    const ease = 1 - (1 - t) * (1 - t);
+    const y    = dp.fromY + (dp.toY - dp.fromY) * ease;
+    drawBar(dp.cx, y, dp.w, BH, dp.color, dp.miss ? 1 - t : 1);
+
+    // 잘려나간 조각
+    if (!dp.miss && dp.trW > 1 && dp.trCx !== null) {
+      const tx = dp.trCx + dp.trDir * ease * 120;
+      const ty = dp.fromY + ease * 280;
+      cx.save();
+      cx.globalAlpha = Math.max(0, 1 - ease * 1.4);
+      cx.translate(tx, ty); cx.rotate(dp.trDir * ease * 2.8); cx.translate(-tx, -ty);
+      drawBar(tx, ty, dp.trW, BH, dp.color);
+      cx.restore();
+    }
+
+    if (!dp.miss && t >= 1 && phase === 'drop') land();
+  }
+
+  // 이동 중인 바
+  if (phase === 'play') {
+    drawBar(mv.cx, MOVER_Y, mv.w, BH, col(stack.length));
+    cx.save();
+    cx.strokeStyle = 'rgba(255,255,255,.05)';
+    cx.setLineDash([3, 10]); cx.lineWidth = 1;
+    cx.beginPath(); cx.moveTo(mv.cx, MOVER_Y + BH + 4); cx.lineTo(mv.cx, landY()); cx.stroke();
+    cx.setLineDash([]);
+    cx.restore();
+  }
+}
+
+function loop(ts) {
+  if (phase === 'play') {
+    const pad = Math.max(mv.w * 0.55, 28);
+    mv.cx += mv.dir * mv.spd;
+    if (mv.cx > W - pad) { mv.cx = W - pad; mv.dir = -1; }
+    if (mv.cx < pad)     { mv.cx = pad;     mv.dir =  1; }
+  }
+  draw(ts);
+  requestAnimationFrame(loop);
+}
+
+// ── 입력
+document.getElementById('drop').addEventListener('pointerdown', e => { e.preventDefault(); tap(); });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowDown') { e.preventDefault(); tap(); }
+});
+document.getElementById('retry').addEventListener('click', () => {
+  document.getElementById('ov').classList.remove('on');
+  start();
+});
+
+start();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
