@@ -205,13 +205,27 @@ html, body {
 </div>
 
 <script>
+// localStorage를 못 쓰는 환경(iOS 프라이빗 등) 대비 메모리 폴백
+let _name = '';
+
+function _getStoredName() {
+  if (_name) return _name;
+  try { return localStorage.getItem('gameName') || ''; } catch(e) { return ''; }
+}
+
+function _setStoredName(name) {
+  _name = name;
+  try { localStorage.setItem('gameName', name); } catch(e) {}
+}
+
 function selectName(name) {
-  localStorage.setItem('gameName', name);
+  _setStoredName(name);
   showHub();
 }
 
 function showHub() {
-  const name = localStorage.getItem('gameName');
+  const name = _getStoredName();
+  if (!name) return;
   document.getElementById('greet-name').textContent = name;
   document.getElementById('name-screen').classList.remove('active');
   document.getElementById('hub-screen').classList.add('active');
@@ -223,7 +237,7 @@ function changeName() {
 }
 
 // 이미 이름 있으면 바로 허브로
-if (localStorage.getItem('gameName')) showHub();
+showHub();
 </script>
 </body>
 </html>
