@@ -52,8 +52,9 @@ while true; do
     echo "❌ [$TIMESTAMP] 푸시 실패: $PUSH_ERR"
   fi
 
-  # Firebase Hosting 배포
-  FIREBASE_ERR=$(firebase deploy --only hosting --project game-3ce55 --quiet 2>&1)
+  # Firebase Hosting 배포 (전체 경로 사용)
+  FIREBASE_BIN=$(which firebase 2>/dev/null || echo "/opt/homebrew/bin/firebase")
+  FIREBASE_ERR=$("$FIREBASE_BIN" deploy --only hosting --project game-3ce55 --quiet 2>&1)
   if [ $? -eq 0 ]; then
     echo "🔥 [$TIMESTAMP] Firebase 배포 완료"
   else
