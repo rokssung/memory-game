@@ -192,7 +192,18 @@ html, body {
 </style>
 </head>
 <body>
-<a id="home-btn" href="index.html">🏠 홈</a>
+<div id="quit-confirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:999;">
+  <div style="background:#16213e;border:2px solid #e94560;border-radius:20px;padding:28px 24px;text-align:center;width:88%;max-width:300px;">
+    <div style="font-size:32px;margin-bottom:8px">🚪</div>
+    <h3 style="font-size:20px;margin-bottom:8px">게임을 나가시겠어요?</h3>
+    <p style="font-size:14px;color:#aaa;margin-bottom:20px">방에서 나가게 됩니다</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="document.getElementById('quit-confirm').style.display='none'" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:rgba(255,255,255,0.1);color:white;cursor:pointer">계속 하기</button>
+      <button onclick="location.href='index.html'" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:#e94560;color:white;cursor:pointer">나가기</button>
+    </div>
+  </div>
+</div>
+<a id="home-btn" href="#" onclick="event.preventDefault();document.getElementById('quit-confirm').style.display='flex'">🏠 홈</a>
 
 <!-- 1. 입장 화면 -->
 <div id="screen-join" class="screen active">
@@ -289,6 +300,12 @@ const firebaseConfig = {
 // ════════════════════════════════════════════════
 
 firebase.initializeApp(firebaseConfig);
+
+// localStorage 이름 자동 입력
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('gameName');
+  if (saved) document.getElementById('inp-name').value = saved;
+});
 const db = firebase.database();
 
 // 상태
