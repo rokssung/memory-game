@@ -282,6 +282,15 @@ function changeName() {
   document.getElementById('name-screen').classList.add('active');
 }
 
+// 랭킹 초기화 (한 번만 실행)
+if (!localStorage.getItem('ranks_reset_v1')) {
+  ['jumpgame_scores','memorygame_scores','bstack_best','bstack_rank',
+   'jump_best','memory_easy_best','memory_normal_best','memory_hard_best'].forEach(k => {
+    try { localStorage.removeItem(k); } catch(e) {}
+  });
+  localStorage.setItem('ranks_reset_v1', '1');
+}
+
 // 이미 이름 있으면 바로 허브로
 showHub();
 </script>
