@@ -309,10 +309,27 @@
     border-color: #f1c40f; color: #f1c40f;
     background: rgba(241,196,15,0.12);
   }
+
+  #home-btn {
+    position: fixed;
+    top: 10px; left: 10px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    font-size: 13px;
+    font-weight: bold;
+    border-radius: 20px;
+    padding: 7px 14px;
+    cursor: pointer;
+    z-index: 999;
+    text-decoration: none;
+    backdrop-filter: blur(4px);
+  }
 </style>
 </head>
 <body>
 
+<a id="home-btn" href="index.html">🏠 홈</a>
 <h1>🧠 메모리 게임</h1>
 
 <div class="hud">
