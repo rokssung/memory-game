@@ -322,26 +322,32 @@ async function createRoom() {
   myName = document.getElementById('inp-name').value.trim();
   if (!myName) { setError('닉네임을 입력해주세요'); return; }
 
-  const code = Math.random().toString(36).slice(2, 6).toUpperCase();
-  roomCode = code;
-  isHost = true;
-  roomRef = db.ref('rooms/' + code);
+  setError('🔄 방 만드는 중...');
+  try {
+    const code = Math.random().toString(36).slice(2, 6).toUpperCase();
+    roomCode = code;
+    isHost = true;
+    roomRef = db.ref('rooms/' + code);
 
-  await roomRef.set({
-    host: myId,
-    state: 'lobby',
-    round: 0,
-    totalRounds: 5,
-    flashTime: 0,
-  });
-  await roomRef.child('players/' + myId).set({
-    name: myName,
-    avatar: myAvatar(),
-    score: 0,
-  });
+    await roomRef.set({
+      host: myId,
+      state: 'lobby',
+      round: 0,
+      totalRounds: 5,
+      flashTime: 0,
+    });
+    await roomRef.child('players/' + myId).set({
+      name: myName,
+      avatar: myAvatar(),
+      score: 0,
+    });
 
-  roomRef.onDisconnect().remove();
-  enterLobby();
+    roomRef.onDisconnect().remove();
+    enterLobby();
+  } catch(e) {
+    setError('❌ Firebase 연결 실패: ' + e.message);
+    console.error(e);
+  }
 }
 
 // ── 방 입장 ────────────────────────────────────
@@ -351,7 +357,13 @@ async function joinRoom() {
   if (!myName) { setError('닉네임을 입력해주세요'); return; }
   if (code.length !== 4) { setError('방 코드 4자리를 입력해주세요'); return; }
 
-  const snap = await db.ref('rooms/' + code).once('value');
+  setError('🔄 연결 중...');
+  let snap;
+  try {
+    snap = await db.ref('rooms/' + code).once('value');
+  } catch(e) {
+    setError('❌ Firebase 연결 실패: ' + e.message); return;
+  }
   if (!snap.exists()) { setError('방을 찾을 수 없어요'); return; }
 
   const room = snap.val();
