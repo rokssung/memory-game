@@ -257,6 +257,18 @@ function selectName(name) {
   showHub();
 }
 
+function submitCustomName() {
+  const val = document.getElementById('name-custom').value.trim();
+  if (!val) return;
+  selectName(val);
+}
+
+// Enter 키로도 제출
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('name-custom');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitCustomName(); });
+});
+
 function showHub() {
   const name = _getStoredName();
   if (!name) return;
