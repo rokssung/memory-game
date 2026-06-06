@@ -47,8 +47,16 @@ while true; do
 
   PUSH_ERR=$(git push 2>&1)
   if [ $? -eq 0 ]; then
-    echo "✅ [$TIMESTAMP] 배포 완료 → $CHANGED"
+    echo "✅ [$TIMESTAMP] git push 완료 → $CHANGED"
   else
     echo "❌ [$TIMESTAMP] 푸시 실패: $PUSH_ERR"
+  fi
+
+  # Firebase Hosting 배포
+  FIREBASE_ERR=$(firebase deploy --only hosting --project game-3ce55 --quiet 2>&1)
+  if [ $? -eq 0 ]; then
+    echo "🔥 [$TIMESTAMP] Firebase 배포 완료"
+  else
+    echo "❌ [$TIMESTAMP] Firebase 배포 실패: $FIREBASE_ERR"
   fi
 done
