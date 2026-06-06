@@ -42,7 +42,20 @@
 </style>
 </head>
 <body>
-<a id="home-btn" href="index.html">🏠 홈</a>
+<a id="home-btn" href="#" onclick="event.preventDefault();showQuitConfirm()">🏠 홈</a>
+
+<div id="quit-confirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:999;">
+  <div style="background:#16213e;border:2px solid #e94560;border-radius:20px;padding:28px 24px;text-align:center;width:88%;max-width:300px;">
+    <div style="font-size:32px;margin-bottom:8px">🚪</div>
+    <h3 style="font-size:20px;margin-bottom:8px">게임을 나가시겠어요?</h3>
+    <p style="font-size:14px;color:#aaa;margin-bottom:20px">현재 점수는 저장되지 않아요</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeQuitConfirm()" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:rgba(255,255,255,0.1);color:white;cursor:pointer">계속 하기</button>
+      <button onclick="location.href='index.html'" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:#e94560;color:white;cursor:pointer">나가기</button>
+    </div>
+  </div>
+</div>
+
 <div id="canvas-wrapper">
   <canvas id="gameCanvas"></canvas>
 </div>
@@ -645,7 +658,13 @@ function update() {
     if (spikeAnim.timer >= spikeAnim.maxTimer) {
       spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
       pendingScore = score;
-      gameState = 'namePick';
+      const savedName = localStorage.getItem('gameName');
+      if (savedName) {
+        saveRanking(savedName, pendingScore);
+        gameState = 'ranking';
+      } else {
+        gameState = 'namePick';
+      }
     }
     return; // 애니메이션 중엔 게임 일시정지
   }
@@ -774,6 +793,15 @@ function update() {
   }
 }
 
+
+// 나가기 확인 팝업 (캔버스 위 HTML 오버레이)
+function showQuitConfirm() {
+  document.getElementById('quit-confirm').style.display = 'flex';
+}
+function closeQuitConfirm() {
+  document.getElementById('quit-confirm').style.display = 'none';
+}
+
 function gameLoop() {
   ctx.clearRect(0, 0, 800, 500);
   drawBackground();
@@ -806,7 +834,7 @@ function gameLoop() {
     drawRanking();
   } else if (gameState === 'playing') {
     // 그만두기 버튼 (우상단)
-    activeButtons = [makeBtn(692, 8, 100, 26, () => { gameState = 'start'; })];
+    activeButtons = [makeBtn(692, 8, 100, 26, () => { showQuitConfirm(); })];
     ctx.fillStyle = 'rgba(180,30,30,0.85)';
     ctx.beginPath(); ctx.roundRect(692, 8, 100, 26, 6); ctx.fill();
     ctx.fillStyle = 'white';
