@@ -16,23 +16,77 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
-  display: flex;
+/* ── 이름 선택 화면 ── */
+#name-screen {
+  display: none;
+  position: fixed; inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background: #1a1a2e;
+  z-index: 100;
+}
+#name-screen.active { display: flex; }
+#name-screen h1 { font-size: 52px; margin-bottom: 6px; }
+#name-screen h2 { font-size: 24px; margin-bottom: 6px; }
+#name-screen p  { font-size: 14px; color: #666; margin-bottom: 28px; }
+
+.name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.name-btn {
+  padding: 18px 10px;
+  border: none; border-radius: 16px;
+  font-size: 20px; font-weight: bold;
+  color: white; cursor: pointer;
+  transition: transform 0.12s;
+}
+.name-btn:active { transform: scale(0.95); }
+.name-btn:nth-child(1) { background: linear-gradient(135deg, #e94560, #c0392b); }
+.name-btn:nth-child(2) { background: linear-gradient(135deg, #8e44ad, #6c3483); }
+.name-btn:nth-child(3) { background: linear-gradient(135deg, #27ae60, #1e8449); }
+.name-btn:nth-child(4) { background: linear-gradient(135deg, #e67e22, #d35400); }
+
+/* ── 허브 화면 ── */
+#hub-screen {
+  display: none;
   flex-direction: column;
   align-items: center;
   padding: 28px 16px 40px;
+  min-height: 100vh;
 }
+#hub-screen.active { display: flex; }
 
-/* 헤더 */
-.header {
-  text-align: center;
-  margin-bottom: 32px;
-}
+.header { text-align: center; margin-bottom: 28px; }
 .header .logo { font-size: 52px; line-height: 1; margin-bottom: 6px; }
 .header h1 { font-size: clamp(22px, 7vw, 30px); letter-spacing: 1px; }
-.header p  { font-size: 14px; color: #666; margin-top: 4px; }
 
-/* 게임 카드 그리드 */
+.player-greeting {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 8px 16px;
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+.player-greeting .greet-name { font-weight: bold; color: #f1c40f; }
+.change-btn {
+  font-size: 12px; color: #666;
+  background: none; border: none;
+  cursor: pointer; padding: 2px 6px;
+  border-radius: 8px;
+  text-decoration: underline;
+}
+.change-btn:hover { color: #aaa; }
+
 .game-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
@@ -41,7 +95,6 @@ body {
   max-width: 720px;
 }
 
-/* 카드 */
 .game-card {
   background: rgba(255,255,255,0.05);
   border: 2px solid rgba(255,255,255,0.08);
@@ -53,112 +106,124 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  transition: transform 0.15s, border-color 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.game-card:active {
-  transform: scale(0.97);
-  background: rgba(255,255,255,0.09);
-}
+.game-card:active { transform: scale(0.97); }
 
 .game-card .icon {
-  font-size: 48px;
-  width: 64px; height: 64px;
+  font-size: 48px; width: 64px; height: 64px;
   border-radius: 16px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-
 .game-card .info { flex: 1; }
 .game-card .info h2 { font-size: 18px; margin-bottom: 4px; }
 .game-card .info p  { font-size: 13px; color: #888; line-height: 1.4; }
-
 .game-card .badge {
   font-size: 11px; font-weight: bold;
   padding: 3px 9px; border-radius: 10px;
-  align-self: flex-start; flex-shrink: 0;
-  white-space: nowrap;
+  align-self: flex-start; flex-shrink: 0; white-space: nowrap;
 }
+.players-tag { font-size: 12px; color: #555; margin-top: 6px; }
 
-/* 카드별 색상 */
 .card-jump   { border-color: rgba(233,69,96,0.3); }
-.card-jump:active { border-color: #e94560; }
-.card-jump   .icon { background: rgba(233,69,96,0.15); }
+.card-jump   .icon  { background: rgba(233,69,96,0.15); }
 .card-jump   .badge { background: rgba(233,69,96,0.2); color: #e94560; }
 
 .card-memory { border-color: rgba(100,180,255,0.3); }
-.card-memory:active { border-color: #64b4ff; }
-.card-memory .icon { background: rgba(100,180,255,0.12); }
+.card-memory .icon  { background: rgba(100,180,255,0.12); }
 .card-memory .badge { background: rgba(100,180,255,0.15); color: #64b4ff; }
 
 .card-reaction { border-color: rgba(241,196,15,0.3); }
-.card-reaction:active { border-color: #f1c40f; }
-.card-reaction .icon { background: rgba(241,196,15,0.12); }
+.card-reaction .icon  { background: rgba(241,196,15,0.12); }
 .card-reaction .badge { background: rgba(241,196,15,0.15); color: #f1c40f; }
 
-/* 플레이어 수 태그 */
-.players-tag {
-  font-size: 12px; color: #555;
-  margin-top: 6px;
-}
-
-/* 하단 */
-.footer {
-  margin-top: 36px;
-  text-align: center;
-  color: #333;
-  font-size: 12px;
-}
+.footer { margin-top: 36px; text-align: center; color: #333; font-size: 12px; }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="logo">🎮</div>
-  <h1>패밀리 게임 허브</h1>
-  <p>게임을 선택해서 시작하세요</p>
+<!-- 이름 선택 화면 -->
+<div id="name-screen" class="active">
+  <h1>🎮</h1>
+  <h2>패밀리 게임 허브</h2>
+  <p>누구세요?</p>
+  <div class="name-grid">
+    <button class="name-btn" onclick="selectName('유빵꾸')">유빵꾸</button>
+    <button class="name-btn" onclick="selectName('유똥꼬')">유똥꼬</button>
+    <button class="name-btn" onclick="selectName('유똥')">유똥</button>
+    <button class="name-btn" onclick="selectName('조똥')">조똥</button>
+  </div>
 </div>
 
-<div class="game-grid">
+<!-- 게임 허브 화면 -->
+<div id="hub-screen">
+  <div class="header">
+    <div class="logo">🎮</div>
+    <h1>패밀리 게임 허브</h1>
+  </div>
 
-  <!-- 점프 히어로 -->
-  <a class="game-card card-jump" href="jump_game.html">
-    <div class="icon">🏃</div>
-    <div class="info">
-      <h2>점프 히어로</h2>
-      <p>장애물을 피하고 아이템을 먹어보세요! 버섯 먹으면 3배로 커져요.</p>
-      <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 랭킹 있음</div>
-    </div>
-    <div class="badge">런게임</div>
-  </a>
+  <div class="player-greeting">
+    <span>안녕하세요,</span>
+    <span class="greet-name" id="greet-name">--</span>
+    <span>님!</span>
+    <button class="change-btn" onclick="changeName()">변경</button>
+  </div>
 
-  <!-- 메모리 게임 -->
-  <a class="game-card card-memory" href="memory_game.html">
-    <div class="icon">🧠</div>
-    <div class="info">
-      <h2>메모리 게임</h2>
-      <p>카드를 뒤집어 짝을 찾아요. 쉬움·보통·어려움 세 가지 난이도!</p>
-      <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 난이도별 랭킹</div>
-    </div>
-    <div class="badge">카드 게임</div>
-  </a>
+  <div class="game-grid">
+    <a class="game-card card-jump" href="jump_game.html">
+      <div class="icon">🏃</div>
+      <div class="info">
+        <h2>점프 히어로</h2>
+        <p>장애물을 피하고 아이템을 먹어보세요! 버섯 먹으면 3배로 커져요.</p>
+        <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 랭킹 있음</div>
+      </div>
+      <div class="badge">런게임</div>
+    </a>
+    <a class="game-card card-memory" href="memory_game.html">
+      <div class="icon">🧠</div>
+      <div class="info">
+        <h2>메모리 게임</h2>
+        <p>카드를 뒤집어 짝을 찾아요. 쉬움·보통·어려움 세 가지 난이도!</p>
+        <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 난이도별 랭킹</div>
+      </div>
+      <div class="badge">카드 게임</div>
+    </a>
+    <a class="game-card card-reaction" href="reaction_battle.html">
+      <div class="icon">⚡</div>
+      <div class="info">
+        <h2>반응속도 배틀</h2>
+        <p>신호가 뜨면 제일 먼저 눌러요! 각자 폰으로 접속해서 실시간 대결.</p>
+        <div class="players-tag">👥 2~6인용 &nbsp;·&nbsp; 실시간 멀티플레이</div>
+      </div>
+      <div class="badge">멀티플레이</div>
+    </a>
+  </div>
 
-  <!-- 반응속도 배틀 -->
-  <a class="game-card card-reaction" href="reaction_battle.html">
-    <div class="icon">⚡</div>
-    <div class="info">
-      <h2>반응속도 배틀</h2>
-      <p>신호가 뜨면 제일 먼저 눌러요! 각자 폰으로 접속해서 실시간 대결.</p>
-      <div class="players-tag">👥 2~6인용 &nbsp;·&nbsp; 실시간 멀티플레이</div>
-    </div>
-    <div class="badge">멀티플레이</div>
-  </a>
-
+  <div class="footer">패밀리 게임 허브 &nbsp;·&nbsp; bejewelled-fairy-2ee516.netlify.app</div>
 </div>
 
-<div class="footer">
-  패밀리 게임 허브 &nbsp;·&nbsp; bejewelled-fairy-2ee516.netlify.app
-</div>
+<script>
+function selectName(name) {
+  localStorage.setItem('gameName', name);
+  showHub();
+}
 
+function showHub() {
+  const name = localStorage.getItem('gameName');
+  document.getElementById('greet-name').textContent = name;
+  document.getElementById('name-screen').classList.remove('active');
+  document.getElementById('hub-screen').classList.add('active');
+}
+
+function changeName() {
+  document.getElementById('hub-screen').classList.remove('active');
+  document.getElementById('name-screen').classList.add('active');
+}
+
+// 이미 이름 있으면 바로 허브로
+if (localStorage.getItem('gameName')) showHub();
+</script>
 </body>
 </html>
