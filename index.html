@@ -54,6 +54,23 @@ html, body {
 .name-btn:nth-child(3) { background: linear-gradient(135deg, #27ae60, #1e8449); }
 .name-btn:nth-child(4) { background: linear-gradient(135deg, #e67e22, #d35400); }
 
+/* ── 직접 입력 ── */
+.name-input-wrap {
+  display: flex; gap: 8px; width: 100%; max-width: 300px; margin-top: 8px;
+}
+.name-input {
+  flex: 1; padding: 14px 16px; border: none; border-radius: 14px;
+  background: rgba(255,255,255,0.08); color: white; font-size: 16px;
+  outline: none; border: 1px solid rgba(255,255,255,0.12);
+}
+.name-input::placeholder { color: #555; }
+.name-input:focus { border-color: rgba(255,255,255,0.3); }
+.name-submit {
+  padding: 14px 18px; border: none; border-radius: 14px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white; font-size: 16px; cursor: pointer;
+}
+
 /* ── 허브 화면 ── */
 #hub-screen {
   display: none;
