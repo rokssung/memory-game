@@ -843,10 +843,9 @@ document.getElementById('hint-modal').addEventListener('click', e => {
     document.getElementById('hint-modal').classList.remove('on');
 });
 
-// ── 버튼
-document.getElementById('start-btn').addEventListener('click', startGame);
-document.getElementById('retry-btn').addEventListener('click', startGame);
-document.getElementById('retry-btn2').addEventListener('click', startGame);
+// ── 버튼 (start-btn 제거됨 - 난이도 버튼이 selectGrade() 직접 호출)
+document.getElementById('retry-btn').addEventListener('click', () => startGame());
+document.getElementById('retry-btn2').addEventListener('click', () => startGame());
 </script>
 </body>
 </html>
