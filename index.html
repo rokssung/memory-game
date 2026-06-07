@@ -280,10 +280,17 @@ html, body {
   </div>
 
   <div class="footer">패밀리 게임 허브 &nbsp;·&nbsp; game-3ce55.web.app</div>
-  <div class="footer" id="version-tag" style="margin-top:4px;">버전 v2026.06.07-1</div>
+  <div class="footer" id="version-tag" style="margin-top:4px;color:#fdf6b2;"></div>
 </div>
 
 <script>
+// 배포할 때마다 올려서 게임 링크의 캐시를 강제로 새로고침시킨다
+const APP_VERSION = '2026.06.07-1';
+document.getElementById('version-tag').textContent = '버전 v' + APP_VERSION;
+document.querySelectorAll('.game-card').forEach(a => {
+  a.href = a.getAttribute('href') + '?v=' + APP_VERSION;
+});
+
 // localStorage를 못 쓰는 환경(iOS 프라이빗 등) 대비 메모리 폴백
 let _name = '';
 
