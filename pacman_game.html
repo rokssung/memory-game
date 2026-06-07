@@ -325,44 +325,57 @@ function moveGhost(g) {
     return;
   }
 
-  const spd = scared ? 0.5 : (0.7 + level * 0.05);
+  const spd = scared ? 0.04 : (0.06 + (level - 1) * 0.004);
   const cr = Math.round(g.r), cc = Math.round(g.c);
-  const target = ghostTarget(g);
 
-  // Pick best direction (no reversing)
-  let best = null, bestDist = Infinity;
-  for (const d of DIRS) {
-    if (d.r === -g.dr && d.c === -g.dc) continue; // no reverse
-    const nr = cr + d.r, nc = cc + d.c;
-    if (isWall(nr, nc, true)) continue;
-    const dist = (nr - target.r)**2 + (nc - target.c)**2;
-    if (scared ? dist > bestDist : dist < bestDist) { bestDist = dist; best = d; }
-  }
-  if (!best) {
-    // allow reverse
+  // Only choose new direction when near a cell center
+  const atCenter = Math.abs(g.r - cr) < spd * 2 && Math.abs(g.c - cc) < spd * 2;
+  if (atCenter) {
+    const target = ghostTarget(g);
+    let best = null, bestDist = scared ? -Infinity : Infinity;
     for (const d of DIRS) {
+      if (d.r === -g.dr && d.c === -g.dc) continue; // no reverse
       const nr = cr + d.r, nc = cc + d.c;
-      if (!isWall(nr, nc, true)) { best = d; break; }
+      if (isWall(nr, nc, true)) continue;
+      const dist = (nr - target.r)**2 + (nc - target.c)**2;
+      if (scared ? dist > bestDist : dist < bestDist) { bestDist = dist; best = d; }
     }
+    if (!best) {
+      for (const d of DIRS) {
+        const nr = cr + d.r, nc = cc + d.c;
+        if (!isWall(nr, nc, true)) { best = d; break; }
+      }
+    }
+    if (best) { g.dr = best.r; g.dc = best.c; }
+    // snap to cell center to prevent drift
+    g.r = cr; g.c = cc;
   }
-  if (best) { g.dr = best.r; g.dc = best.c; }
 
   const w = wrap(g.r + g.dr * spd, g.c + g.dc * spd);
   g.r = w.r; g.c = w.c;
 }
 
 function movePacman() {
-  const spd = 0.12 + level * 0.005;
+  const spd = 0.10 + (level - 1) * 0.004;
   const cr = Math.round(pacman.r), cc = Math.round(pacman.c);
   const nd = pacman.nextDir;
 
-  // Try next direction first
-  if (nd && !isWall(cr + nd.r, cc + nd.c, false)) {
-    pacman.dir = nd;
-    pacman.nextDir = null;
+  // Try next direction when aligned enough to turn
+  if (nd) {
+    const aligned = Math.abs(pacman.r - cr) < 0.35 && Math.abs(pacman.c - cc) < 0.35;
+    if (aligned && !isWall(cr + nd.r, cc + nd.c, false)) {
+      pacman.dir = nd;
+      pacman.nextDir = null;
+      pacman.r = cr; pacman.c = cc; // snap to cell center on turn
+    }
   }
+
   const d = pacman.dir;
-  if (d.r !== undefined && (d.r !== 0 || d.c !== 0)) {
+  if (d && (d.r !== 0 || d.c !== 0)) {
+    // Keep perpendicular axis snapped to grid so dots are never missed
+    if (d.r !== 0) pacman.c = Math.round(pacman.c);
+    if (d.c !== 0) pacman.r = Math.round(pacman.r);
+
     const nr = pacman.r + d.r * spd;
     const nc = pacman.c + d.c * spd;
     const wr = ((Math.round(nr) % ROWS) + ROWS) % ROWS;
@@ -370,22 +383,26 @@ function movePacman() {
     if (!isWall(wr, wc, false)) {
       const ww = wrap(nr, nc);
       pacman.r = ww.r; pacman.c = ww.c;
+    } else {
+      // Hit wall — snap back to current cell center
+      pacman.r = cr; pacman.c = cc;
     }
   }
 
-  // Eat dots
+  // Eat dots by rounded cell position (reliable regardless of sub-pixel drift)
+  const pr = Math.round(pacman.r), pc = Math.round(pacman.c);
   for (const dot of dots) {
-    if (!dot.eaten && Math.abs(pacman.r - dot.r) < 0.5 && Math.abs(pacman.c - dot.c) < 0.5) {
+    if (!dot.eaten && dot.r === pr && dot.c === pc) {
       dot.eaten = true;
       score += 10;
     }
   }
   for (const pw of powers) {
-    if (!pw.eaten && Math.abs(pacman.r - pw.r) < 0.5 && Math.abs(pacman.c - pw.c) < 0.5) {
+    if (!pw.eaten && pw.r === pr && pw.c === pc) {
       pw.eaten = true;
       score += 50;
       scared = true;
-      scaredTimer = 300 - level * 20;
+      scaredTimer = 300 - (level - 1) * 20;
       if (scaredTimer < 80) scaredTimer = 80;
     }
   }
