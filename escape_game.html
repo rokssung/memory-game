@@ -288,9 +288,33 @@ html, body {
   25%    { transform:translateX(-6px); }
   75%    { transform:translateX(6px); }
 }
+
+#home-btn {
+  position: fixed; top: 10px; left: 10px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white; font-size: 13px; font-weight: bold;
+  border-radius: 20px; padding: 7px 14px;
+  cursor: pointer; z-index: 999;
+  text-decoration: none; backdrop-filter: blur(4px);
+}
 </style>
 </head>
 <body>
+
+<a id="home-btn" href="#" onclick="event.preventDefault();showQuitConfirm()">🏠 홈</a>
+
+<div id="quit-confirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:999;">
+  <div style="background:#16213e;border:2px solid #e94560;border-radius:20px;padding:28px 24px;text-align:center;width:88%;max-width:300px;">
+    <div style="font-size:32px;margin-bottom:8px">🚪</div>
+    <h3 style="font-size:20px;margin-bottom:8px">게임을 나가시겠어요?</h3>
+    <p style="font-size:14px;color:#aaa;margin-bottom:20px">현재 진행상황은 저장되지 않아요</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeQuitConfirm()" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:rgba(255,255,255,0.1);color:white;cursor:pointer">계속 하기</button>
+      <button onclick="location.href='index.html'" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:#e94560;color:white;cursor:pointer">나가기</button>
+    </div>
+  </div>
+</div>
 
 <!-- 타이틀 화면 -->
 <div id="title-screen" class="screen active">
@@ -362,6 +386,9 @@ html, body {
 </div>
 
 <script>
+function showQuitConfirm() { document.getElementById('quit-confirm').style.display = 'flex'; }
+function closeQuitConfirm() { document.getElementById('quit-confirm').style.display = 'none'; }
+
 // ────────────────────────────────────────────────
 // PUZZLE POOLS
 // ────────────────────────────────────────────────

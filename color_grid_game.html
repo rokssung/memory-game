@@ -204,9 +204,33 @@ html, body {
   70%{opacity:1;transform:translate(-50%,-50%) scale(1)}
   100%{opacity:0;transform:translate(-50%,-60%) scale(0.9)}
 }
+
+#home-btn {
+  position: fixed; top: 10px; left: 10px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white; font-size: 13px; font-weight: bold;
+  border-radius: 20px; padding: 7px 14px;
+  cursor: pointer; z-index: 999;
+  text-decoration: none; backdrop-filter: blur(4px);
+}
 </style>
 </head>
 <body>
+
+<a id="home-btn" href="#" onclick="event.preventDefault();showQuitConfirm()">🏠 홈</a>
+
+<div id="quit-confirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:999;">
+  <div style="background:#16213e;border:2px solid #e94560;border-radius:20px;padding:28px 24px;text-align:center;width:88%;max-width:300px;">
+    <div style="font-size:32px;margin-bottom:8px">🚪</div>
+    <h3 style="font-size:20px;margin-bottom:8px">게임을 나가시겠어요?</h3>
+    <p style="font-size:14px;color:#aaa;margin-bottom:20px">현재 점수는 저장되지 않아요</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeQuitConfirm()" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:rgba(255,255,255,0.1);color:white;cursor:pointer">계속 하기</button>
+      <button onclick="location.href='index.html'" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:bold;background:#e94560;color:white;cursor:pointer">나가기</button>
+    </div>
+  </div>
+</div>
 
 <!-- 타이틀 화면 -->
 <div id="title-screen">
@@ -270,6 +294,7 @@ html, body {
   <div id="splash-target"></div>
   <div id="splash-name">빨강</div>
   <div id="splash-hint">이 색깔 타일을 모두 없애세요!</div>
+  <button id="splash-start-btn" class="btn-primary" style="margin-top:16px;padding:14px 44px;font-size:20px;">시작!</button>
 </div>
 
 <!-- 게임 오버 오버레이 -->
@@ -286,14 +311,17 @@ html, body {
 <div id="combo-display"></div>
 
 <script>
+function showQuitConfirm() { document.getElementById('quit-confirm').style.display = 'flex'; }
+function closeQuitConfirm() { document.getElementById('quit-confirm').style.display = 'none'; }
+
 // ── 색깔 정의
 const COLORS = [
-  { id:'red',    name:'빨강', hex:'#ef4444', glow:'rgba(239,68,68,.6)' },
-  { id:'blue',   name:'파랑', hex:'#3b82f6', glow:'rgba(59,130,246,.6)' },
-  { id:'green',  name:'초록', hex:'#22c55e', glow:'rgba(34,197,94,.6)' },
-  { id:'yellow', name:'노랑', hex:'#eab308', glow:'rgba(234,179,8,.6)' },
-  { id:'purple', name:'보라', hex:'#a855f7', glow:'rgba(168,85,247,.6)' },
-  { id:'orange', name:'주황', hex:'#f97316', glow:'rgba(249,115,22,.6)' },
+  { id:'red',    name:'빨강', hex:'#ff2222', glow:'rgba(255,34,34,.7)' },
+  { id:'blue',   name:'파랑', hex:'#1177ff', glow:'rgba(17,119,255,.7)' },
+  { id:'green',  name:'초록', hex:'#00cc44', glow:'rgba(0,204,68,.7)' },
+  { id:'yellow', name:'노랑', hex:'#ffdd00', glow:'rgba(255,221,0,.7)' },
+  { id:'purple', name:'보라', hex:'#cc22ff', glow:'rgba(204,34,255,.7)' },
+  { id:'orange', name:'주황', hex:'#ff8800', glow:'rgba(255,136,0,.7)' },
 ];
 
 // ── 모드 설정
@@ -313,6 +341,16 @@ function getBest(key) {
 }
 function setBest(key, val) {
   try { localStorage.setItem(key, val); } catch(e){}
+}
+function saveRank(modeKey, sc) {
+  try {
+    const name = (() => { try { return localStorage.getItem('gameName') || '?'; } catch(e){ return '?'; } })();
+    const key = 'cgame_rank_' + modeKey;
+    const ranks = JSON.parse((() => { try { return localStorage.getItem(key) || '[]'; } catch(e){ return '[]'; } })());
+    ranks.push({ name, score: sc, date: new Date().toLocaleDateString('ko-KR') });
+    ranks.sort((a,b) => b.score - a.score);
+    localStorage.setItem(key, JSON.stringify(ranks.slice(0,10)));
+  } catch(e) {}
 }
 
 // ── 게임 시작
@@ -357,11 +395,13 @@ function nextRound() {
   document.getElementById('splash-name').textContent = targetColor.name;
   splash.classList.add('on');
 
-  setTimeout(() => {
+  // 시작! 버튼 → 누르는 순간 타이머 시작
+  const startBtn = document.getElementById('splash-start-btn');
+  startBtn.onclick = () => {
     splash.classList.remove('on');
     buildGrid(targetColor);
     startRoundTimer();
-  }, 1500);
+  };
 }
 
 // ── 격자 생성
@@ -373,10 +413,8 @@ function buildGrid(targetColor) {
   grid.innerHTML = '';
   tiles = [];
 
-  // 타겟 색깔은 15~35% 배치
-  const minTarget = Math.max(3, Math.floor(total * 0.15));
-  const maxTarget = Math.floor(total * 0.40);
-  const targetCount = minTarget + Math.floor(Math.random() * (maxTarget - minTarget + 1));
+  // 라운드별 타겟 수: 1라운드=4개, 2라운드=5개, ...
+  const targetCount = Math.min(3 + round, Math.floor(total * 0.55));
   const otherColors = roundColors.filter(c => c.id !== targetColor.id);
 
   const colorAssign = [];
@@ -513,6 +551,7 @@ function endGame(cleared) {
   const prev = getBest(bestKey);
   const isNew = score > prev;
   if (isNew) setBest(bestKey, score);
+  saveRank(mode.key, score);
 
   document.getElementById('ov-icon').textContent = cleared ? '🏆' : '⏰';
   document.getElementById('ov-title').textContent = cleared ? '전부 클리어!' : '시간 초과!';
