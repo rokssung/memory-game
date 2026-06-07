@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🎯 색깔 격자 반응</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100%; height:100%; overflow:hidden;
+  background:#0a0a1a;
+  font-family:Arial, sans-serif;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* ── 타이틀 화면 ── */
+#title-screen {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  height:100%; padding:24px; text-align:center;
+}
+#title-screen h1 { font-size:54px; margin-bottom:6px; }
+#title-screen h2 { font-size:24px; color:#a78bfa; margin-bottom:10px; }
+#title-screen .desc {
+  color:#666; font-size:14px; line-height:1.8;
+  max-width:300px; margin-bottom:28px;
+}
+.mode-picker { display:flex; gap:12px; margin-bottom:20px; }
+.mode-btn {
+  flex:1; max-width:140px;
+  padding:14px 10px; border:2px solid rgba(255,255,255,.1);
+  border-radius:18px; background:rgba(255,255,255,.04);
+  color:#fff; cursor:pointer; text-align:center;
+  transition:border-color .15s, background .15s;
+}
+.mode-btn:active { transform:scale(.96); }
+.mode-btn .m-icon { font-size:30px; margin-bottom:6px; }
+.mode-btn .m-name { font-size:14px; font-weight:bold; }
+.mode-btn .m-desc { font-size:11px; color:#888; margin-top:4px; line-height:1.5; }
+.mode-btn.easy { border-color:rgba(74,222,128,.4); }
+.mode-btn.easy:active { background:rgba(74,222,128,.1); }
+.mode-btn.hard { border-color:rgba(251,146,60,.4); }
+.mode-btn.hard:active { background:rgba(251,146,60,.1); }
+.mode-btn.extreme { border-color:rgba(248,113,113,.4); }
+.mode-btn.extreme:active { background:rgba(248,113,113,.1); }
+
+#hub-title { color:#444; font-size:13px; background:none; border:none; cursor:pointer; text-decoration:underline; }
+
+/* ── HUD ── */
+#hud {
+  position:fixed; top:0; left:0; right:0; z-index:10;
+  display:none; align-items:center; justify-content:space-between;
+  padding:12px 18px;
+  background:rgba(10,10,26,.95);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+#hud.active { display:flex; }
+#score-box { display:flex; flex-direction:column; align-items:flex-start; }
+#score-label { font-size:10px; color:#555; letter-spacing:2px; }
+#score { font-size:28px; font-weight:bold; color:#fff; font-variant-numeric:tabular-nums; }
+#timer-box { display:flex; flex-direction:column; align-items:center; }
+#timer-label { font-size:10px; color:#555; letter-spacing:2px; }
+#timer { font-size:28px; font-weight:bold; color:#f1c40f; font-variant-numeric:tabular-nums; }
+#streak-box { display:flex; flex-direction:column; align-items:flex-end; }
+#streak-label { font-size:10px; color:#555; letter-spacing:2px; }
+#streak { font-size:24px; font-weight:bold; color:#f97316; }
+
+/* ── 목표 색깔 배너 ── */
+#target-banner {
+  position:fixed; top:72px; left:0; right:0; z-index:9;
+  display:none; align-items:center; justify-content:center;
+  gap:14px; padding:10px 18px;
+  background:rgba(10,10,26,.9);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+#target-banner.active { display:flex; }
+#target-swatch {
+  width:36px; height:36px; border-radius:10px;
+  border:2px solid rgba(255,255,255,.3);
+  box-shadow:0 0 16px currentColor;
+  flex-shrink:0;
+}
+#target-info { display:flex; flex-direction:column; }
+#target-label { font-size:11px; color:#666; letter-spacing:2px; }
+#target-name { font-size:18px; font-weight:bold; color:#fff; }
+#remaining { font-size:13px; color:#888; margin-left:auto; }
+
+/* ── 격자 영역 ── */
+#grid-wrap {
+  position:fixed; inset:0; top:130px; bottom:0;
+  display:none; align-items:center; justify-content:center;
+  padding:12px;
+}
+#grid-wrap.active { display:flex; }
+#grid {
+  display:grid;
+  gap:5px;
+  width:100%; max-width:420px;
+}
+
+/* ── 타일 ── */
+.tile {
+  border-radius:10px;
+  aspect-ratio:1;
+  cursor:pointer;
+  transition:transform .08s, opacity .15s, box-shadow .1s;
+  border:2px solid rgba(255,255,255,.08);
+  position:relative;
+  overflow:hidden;
+}
+.tile::after {
+  content:'';
+  position:absolute; inset:0;
+  background:rgba(255,255,255,.12);
+  border-radius:8px;
+  top:3px; left:3px; right:3px; height:6px;
+}
+.tile:active { transform:scale(.88); }
+.tile.cleared {
+  opacity:0;
+  pointer-events:none;
+  transform:scale(.6) rotate(10deg);
+}
+.tile.wrong {
+  animation:shake .3s ease;
+  border-color:rgba(255,80,80,.7) !important;
+}
+@keyframes shake {
+  0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)}
+}
+.tile.highlight-pulse {
+  animation:pulse .4s ease;
+}
+@keyframes pulse {
+  0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}
+  70%{box-shadow:0 0 0 10px rgba(255,255,255,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}
+}
+
+/* ── 오버레이 화면 ── */
+#overlay {
+  position:fixed; inset:0; z-index:20;
+  background:rgba(0,0,0,.88);
+  display:none; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:8px; text-align:center; padding:24px;
+}
+#overlay.on { display:flex; }
+#ov-icon  { font-size:60px; }
+#ov-title { color:#fff; font-size:30px; font-weight:bold; }
+#ov-score { color:#a78bfa; font-size:22px; }
+#ov-sub   { color:#555; font-size:14px; margin-bottom:4px; }
+#ov-best  { color:#f97316; font-size:15px; margin-bottom:20px; }
+.btn-primary {
+  padding:14px 48px; border:none; border-radius:24px;
+  background:linear-gradient(135deg,#6366f1,#a855f7);
+  color:#fff; font-size:18px; font-weight:bold; cursor:pointer;
+  box-shadow:0 0 30px rgba(139,92,246,.4);
+}
+#hub-btn { color:#555; font-size:14px; background:none; border:none; cursor:pointer; text-decoration:underline; margin-top:6px; }
+
+/* ── 라운드 전환 ── */
+#round-splash {
+  position:fixed; inset:0; z-index:15;
+  background:rgba(0,0,0,.75);
+  display:none; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px;
+}
+#round-splash.on { display:flex; }
+#splash-round { font-size:16px; color:#888; letter-spacing:3px; }
+#splash-target {
+  width:80px; height:80px; border-radius:20px;
+  border:3px solid rgba(255,255,255,.4);
+  box-shadow:0 0 40px currentColor;
+}
+#splash-name { font-size:28px; font-weight:bold; color:#fff; }
+#splash-hint { font-size:14px; color:#888; }
+
+/* ── 점수 팝업 ── */
+.score-pop {
+  position:fixed; z-index:25; pointer-events:none;
+  font-size:22px; font-weight:bold; color:#fff;
+  text-shadow:0 2px 8px rgba(0,0,0,.8);
+  animation:floatUp .7s ease forwards;
+}
+@keyframes floatUp {
+  0%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(-50px) scale(1.3)}
+}
+
+/* ── 콤보 표시 ── */
+#combo-display {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:14; pointer-events:none;
+  font-size:36px; font-weight:bold; color:#f97316;
+  text-shadow:0 0 20px rgba(249,115,22,.7);
+  display:none;
+  animation:comboAnim .5s ease forwards;
+}
+@keyframes comboAnim {
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}
+  30%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}
+  70%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-60%) scale(0.9)}
+}
+</style>
+</head>
+<body>
+
+<!-- 타이틀 화면 -->
+<div id="title-screen">
+  <h1>🎯</h1>
+  <h2>색깔 격자 반응</h2>
+  <p class="desc">바둑판에서 지정된 색깔 타일만 빠르게 눌러서 없애세요!<br>빠를수록 고득점!</p>
+  <div class="mode-picker">
+    <button class="mode-btn easy" onclick="startGame('easy')">
+      <div class="m-icon">🟢</div>
+      <div class="m-name">쉬움</div>
+      <div class="m-desc">4×4 격자<br>3가지 색깔</div>
+    </button>
+    <button class="mode-btn hard" onclick="startGame('hard')">
+      <div class="m-icon">🟡</div>
+      <div class="m-name">보통</div>
+      <div class="m-desc">5×5 격자<br>4가지 색깔</div>
+    </button>
+    <button class="mode-btn extreme" onclick="startGame('extreme')">
+      <div class="m-icon">🔴</div>
+      <div class="m-name">어려움</div>
+      <div class="m-desc">6×6 격자<br>5가지 색깔</div>
+    </button>
+  </div>
+  <button id="hub-title" onclick="location.href='index.html'">← 게임 허브</button>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="score-box">
+    <div id="score-label">SCORE</div>
+    <div id="score">0</div>
+  </div>
+  <div id="timer-box">
+    <div id="timer-label">TIME</div>
+    <div id="timer">60</div>
+  </div>
+  <div id="streak-box">
+    <div id="streak-label">COMBO</div>
+    <div id="streak">×1</div>
+  </div>
+</div>
+
+<!-- 목표 색깔 배너 -->
+<div id="target-banner">
+  <div id="target-swatch"></div>
+  <div id="target-info">
+    <div id="target-label">TARGET COLOR</div>
+    <div id="target-name">--</div>
+  </div>
+  <div id="remaining">남음: --</div>
+</div>
+
+<!-- 격자 -->
+<div id="grid-wrap">
+  <div id="grid"></div>
+</div>
+
+<!-- 라운드 시작 스플래시 -->
+<div id="round-splash">
+  <div id="splash-round">ROUND 1</div>
+  <div id="splash-target"></div>
+  <div id="splash-name">빨강</div>
+  <div id="splash-hint">이 색깔 타일을 모두 없애세요!</div>
+</div>
+
+<!-- 게임 오버 오버레이 -->
+<div id="overlay">
+  <div id="ov-icon">🎯</div>
+  <div id="ov-title">게임 종료!</div>
+  <div id="ov-score"></div>
+  <div id="ov-sub"></div>
+  <div id="ov-best"></div>
+  <button class="btn-primary" id="retry-btn">다시하기</button>
+  <button id="hub-btn" onclick="location.href='index.html'">← 게임 허브</button>
+</div>
+
+<div id="combo-display"></div>
+
+<script>
+// ── 색깔 정의
+const COLORS = [
+  { id:'red',    name:'빨강', hex:'#ef4444', glow:'rgba(239,68,68,.6)' },
+  { id:'blue',   name:'파랑', hex:'#3b82f6', glow:'rgba(59,130,246,.6)' },
+  { id:'green',  name:'초록', hex:'#22c55e', glow:'rgba(34,197,94,.6)' },
+  { id:'yellow', name:'노랑', hex:'#eab308', glow:'rgba(234,179,8,.6)' },
+  { id:'purple', name:'보라', hex:'#a855f7', glow:'rgba(168,85,247,.6)' },
+  { id:'orange', name:'주황', hex:'#f97316', glow:'rgba(249,115,22,.6)' },
+];
+
+// ── 모드 설정
+const MODES = {
+  easy:    { cols:4, colorCount:3, roundTime:20, rounds:4, label:'4×4 · 3색' },
+  hard:    { cols:5, colorCount:4, roundTime:18, rounds:5, label:'5×5 · 4색' },
+  extreme: { cols:6, colorCount:5, roundTime:15, rounds:6, label:'6×6 · 5색' },
+};
+
+// ── 상태
+let mode, tiles=[], targetColorId, score, combo, timerVal, timerID;
+let round, maxRounds, roundColors, roundOrder;
+let gameRunning=false;
+
+function getBest(key) {
+  try { return parseInt(localStorage.getItem(key)||'0'); } catch(e){return 0;}
+}
+function setBest(key, val) {
+  try { localStorage.setItem(key, val); } catch(e){}
+}
+
+// ── 게임 시작
+function startGame(m) {
+  mode = MODES[m];
+  mode.key = m;
+  score = 0; combo = 1; round = 0;
+  gameRunning = true;
+
+  // 이 모드에 쓸 색깔 순서 생성
+  const shuffled = [...COLORS].sort(()=>Math.random()-.5).slice(0, mode.colorCount);
+  roundColors = shuffled;
+  // 라운드별 타겟 순서 (섞어서)
+  roundOrder = [...Array(mode.rounds)].map((_,i) => shuffled[i % shuffled.length]);
+  // shuffle rounds
+  roundOrder.sort(()=>Math.random()-.5);
+
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('hud').classList.add('active');
+  document.getElementById('target-banner').classList.add('active');
+  document.getElementById('grid-wrap').classList.add('active');
+
+  updateHUD();
+  nextRound();
+}
+
+function nextRound() {
+  clearInterval(timerID);
+  if (round >= mode.rounds) { endGame(true); return; }
+
+  const targetColor = roundOrder[round];
+  targetColorId = targetColor.id;
+  round++;
+
+  // 스플래시 표시
+  const splash = document.getElementById('round-splash');
+  document.getElementById('splash-round').textContent = `ROUND ${round} / ${mode.rounds}`;
+  const sw = document.getElementById('splash-target');
+  sw.style.background = targetColor.hex;
+  sw.style.boxShadow = `0 0 40px ${targetColor.glow}`;
+  sw.style.color = targetColor.glow;
+  document.getElementById('splash-name').textContent = targetColor.name;
+  splash.classList.add('on');
+
+  setTimeout(() => {
+    splash.classList.remove('on');
+    buildGrid(targetColor);
+    startRoundTimer();
+  }, 1500);
+}
+
+// ── 격자 생성
+function buildGrid(targetColor) {
+  const { cols } = mode;
+  const total = cols * cols;
+  const grid = document.getElementById('grid');
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.innerHTML = '';
+  tiles = [];
+
+  // 타겟 색깔은 15~35% 배치
+  const minTarget = Math.max(3, Math.floor(total * 0.15));
+  const maxTarget = Math.floor(total * 0.40);
+  const targetCount = minTarget + Math.floor(Math.random() * (maxTarget - minTarget + 1));
+  const otherColors = roundColors.filter(c => c.id !== targetColor.id);
+
+  const colorAssign = [];
+  for (let i=0; i<targetCount; i++) colorAssign.push(targetColor.id);
+  for (let i=targetCount; i<total; i++) {
+    colorAssign.push(otherColors[Math.floor(Math.random()*otherColors.length)].id);
+  }
+  colorAssign.sort(()=>Math.random()-.5);
+
+  for (let i=0; i<total; i++) {
+    const cid = colorAssign[i];
+    const cDef = COLORS.find(c=>c.id===cid);
+    const div = document.createElement('div');
+    div.className = 'tile';
+    div.dataset.colorId = cid;
+    div.style.background = cDef.hex;
+    div.style.boxShadow = `inset 0 -3px 0 rgba(0,0,0,.25)`;
+    div.addEventListener('pointerdown', e => { e.preventDefault(); onTileTap(div, cid, cDef); });
+    grid.appendChild(div);
+    tiles.push(div);
+  }
+
+  updateTargetBanner(targetColor);
+}
+
+function updateTargetBanner(targetColor) {
+  const sw = document.getElementById('target-swatch');
+  sw.style.background = targetColor.hex;
+  sw.style.boxShadow = `0 0 16px ${targetColor.glow}`;
+  sw.style.color = targetColor.glow;
+  document.getElementById('target-name').textContent = targetColor.name;
+  updateRemaining();
+}
+
+function updateRemaining() {
+  const count = tiles.filter(t => !t.classList.contains('cleared') && t.dataset.colorId === targetColorId).length;
+  document.getElementById('remaining').textContent = `남음: ${count}`;
+}
+
+// ── 타일 탭
+function onTileTap(div, cid, cDef) {
+  if (!gameRunning) return;
+  if (div.classList.contains('cleared')) return;
+
+  if (cid === targetColorId) {
+    // 정답 타일
+    div.classList.add('cleared');
+    combo++;
+    const pts = 10 * Math.floor(combo / 2);
+    score += pts;
+    updateHUD();
+    updateRemaining();
+    showScorePop(div, `+${pts}`);
+    if (combo >= 4) showCombo(combo);
+
+    // 이 색깔 타일 전부 제거됐으면 다음 라운드
+    const remaining = tiles.filter(t => !t.classList.contains('cleared') && t.dataset.colorId === targetColorId).length;
+    if (remaining === 0) {
+      // 라운드 클리어 보너스
+      const bonus = Math.max(0, timerVal) * 5;
+      score += bonus;
+      combo = 1;
+      updateHUD();
+      if (bonus > 0) showScorePop(document.getElementById('timer'), `+${bonus} BONUS`, '#f1c40f');
+      setTimeout(nextRound, 600);
+    }
+  } else {
+    // 오답
+    div.classList.add('wrong');
+    combo = 1;
+    score = Math.max(0, score - 5);
+    updateHUD();
+    setTimeout(() => div.classList.remove('wrong'), 350);
+  }
+}
+
+// ── 타이머
+function startRoundTimer() {
+  timerVal = mode.roundTime;
+  updateTimerDisplay();
+  timerID = setInterval(() => {
+    timerVal--;
+    updateTimerDisplay();
+    if (timerVal <= 0) {
+      clearInterval(timerID);
+      endGame(false);
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const el = document.getElementById('timer');
+  el.textContent = timerVal;
+  el.style.color = timerVal <= 5 ? '#ef4444' : '#f1c40f';
+}
+
+// ── HUD 업데이트
+function updateHUD() {
+  document.getElementById('score').textContent = score;
+  const combo2 = Math.floor(combo / 2);
+  document.getElementById('streak').textContent = combo2 >= 2 ? `×${combo2}` : '×1';
+  document.getElementById('streak').style.color = combo2 >= 3 ? '#ef4444' : combo2 >= 2 ? '#f97316' : '#555';
+}
+
+// ── 스코어 팝업
+function showScorePop(el, text, color='#ffffff') {
+  const rect = el.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.className = 'score-pop';
+  pop.textContent = text;
+  pop.style.left = (rect.left + rect.width/2 - 20) + 'px';
+  pop.style.top  = (rect.top - 10) + 'px';
+  pop.style.color = color;
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 750);
+}
+
+function showCombo(n) {
+  const el = document.getElementById('combo-display');
+  el.textContent = `${Math.floor(n/2)}× COMBO!`;
+  el.style.display = 'block';
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = 'comboAnim .5s ease forwards';
+  setTimeout(() => { el.style.display='none'; }, 550);
+}
+
+// ── 게임 종료
+function endGame(cleared) {
+  clearInterval(timerID);
+  gameRunning = false;
+
+  const bestKey = 'cgame_best_' + mode.key;
+  const prev = getBest(bestKey);
+  const isNew = score > prev;
+  if (isNew) setBest(bestKey, score);
+
+  document.getElementById('ov-icon').textContent = cleared ? '🏆' : '⏰';
+  document.getElementById('ov-title').textContent = cleared ? '전부 클리어!' : '시간 초과!';
+  document.getElementById('ov-score').textContent = `점수: ${score}점`;
+  document.getElementById('ov-sub').textContent = `${mode.label} · ${round-1}/${mode.rounds} 라운드`;
+  const best = isNew ? score : prev;
+  document.getElementById('ov-best').textContent = isNew ? `🎉 신기록! ${score}점` : `최고: ${best}점`;
+  document.getElementById('overlay').classList.add('on');
+}
+
+// ── 재시작
+document.getElementById('retry-btn').addEventListener('click', () => {
+  document.getElementById('overlay').classList.remove('on');
+  startGame(mode.key);
+});
+</script>
+</body>
+</html>
