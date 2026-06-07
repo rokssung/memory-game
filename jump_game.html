@@ -597,7 +597,7 @@ function drawNamePick() {
   ctx.fillText('이름을 선택하세요', 400, 180);
   ctx.textAlign = 'left';
 
-  const names = ['유빵꾸', '유똥꼬', '유똥', '조똥'];
+  const names = ['유성록', '유서현', '유이환', '조정윤'];
   const colors = ['#8e44ad', '#2980b9', '#27ae60', '#e67e22'];
   const bw = 155, bh = 48, gap = 16;
   const totalW = bw * 2 + gap;
@@ -647,9 +647,11 @@ function drawRanking() {
   }
 
   activeButtons = [
-    makeBtn(300, 435, 200, 40, () => { gameState = 'start'; }),
+    makeBtn(190, 435, 185, 40, () => { gameState = 'start'; }),
+    makeBtn(390, 435, 185, 40, () => { location.href = 'index.html'; }),
   ];
-  drawRoundBtn(300, 435, 200, 40, '↩  다시 시작', '#2c3e50');
+  drawRoundBtn(190, 435, 185, 40, '↩  다시 시작', '#2c3e50');
+  drawRoundBtn(390, 435, 185, 40, '🏠  게임 허브', '#6366f1');
 }
 
 function update() {

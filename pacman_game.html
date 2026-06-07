@@ -229,18 +229,16 @@ function spawnPos() {
 }
 
 function initGhosts() {
-  const home = findChar('G') || {r:14, c:11};
+  // Ghost house interior is at rows 13-15, cols 11-16
+  const homeR = 14, homeC = 11;
   ghosts = GHOST_COLORS.map((color, i) => ({
-    r: home.r, c: home.c + i,
-    pr: home.r, pc: home.c + i,
-    fr: 0, // fractional position
-    fc: 0,
+    r: homeR, c: homeC + i,
     dr: 0, dc: 0,
+    targetR: homeR, targetC: homeC + i, // tile-based target
     color,
     name: GHOST_NAMES[i],
-    speed: 0.07,
     mode: 'house',
-    houseTimer: i * 60,
+    houseTimer: 60 + i * 100, // stagger release
     eaten: false,
   }));
 }
@@ -302,62 +300,75 @@ function ghostTarget(g) {
   return { r: ROWS - 3, c: 2 }; // Clyde: corner
 }
 
+function pickGhostDir(g) {
+  const cr = Math.round(g.r), cc = Math.round(g.c);
+  const tgt = ghostTarget(g);
+  let bestDir = null, bestDist = scared ? -Infinity : Infinity;
+  for (const d of DIRS) {
+    if ((g.dr !== 0 || g.dc !== 0) && d.r === -g.dr && d.c === -g.dc) continue; // no 180
+    const nr = cr + d.r, nc = cc + d.c;
+    if (isWall(nr, nc, true)) continue;
+    const dist = (nr - tgt.r) ** 2 + (nc - tgt.c) ** 2;
+    if (scared ? dist > bestDist : dist < bestDist) { bestDist = dist; bestDir = d; }
+  }
+  // fallback: allow reverse
+  if (!bestDir) {
+    for (const d of DIRS) {
+      if (!isWall(cr + d.r, cc + d.c, true)) { bestDir = d; break; }
+    }
+  }
+  return bestDir;
+}
+
 function moveGhost(g) {
   if (g.mode === 'house') {
     g.houseTimer--;
     if (g.houseTimer <= 0) g.mode = 'exit';
     return;
   }
+
+  const spd = scared ? 0.04 : Math.min(0.12, 0.06 + (level - 1) * 0.005);
+
   if (g.mode === 'exit') {
-    // Exit path: slide to col 13 (door center) first, then move straight up to row 11
+    // Step 1: slide to door column (col 13)
+    // Step 2: move straight up to row 11 (above ghost house door)
     const exitC = 13, exitR = 11;
-    const spd = 0.06;
-    if (Math.abs(g.c - exitC) > 0.1) {
-      // Step 1: align column
-      g.c += Math.sign(exitC - g.c) * Math.min(spd, Math.abs(g.c - exitC));
-    } else {
+    if (Math.abs(g.c - exitC) > spd) {
+      g.c += Math.sign(exitC - g.c) * spd;
+    } else if (g.r > exitR + spd) {
       g.c = exitC;
-      if (g.r > exitR + 0.1) {
-        // Step 2: move upward
-        g.r -= Math.min(spd, g.r - exitR);
-      } else {
-        // Arrived
-        g.r = exitR; g.c = exitC;
-        g.mode = 'chase';
-        g.dr = 0; g.dc = -1; // head left into main maze
-      }
+      g.r -= spd;
+    } else {
+      // Arrived above ghost house — enter main maze
+      g.r = exitR; g.c = exitC;
+      g.dr = 0; g.dc = -1;
+      g.targetR = exitR; g.targetC = exitC - 1;
+      g.mode = 'chase';
     }
     return;
   }
 
-  const spd = scared ? 0.04 : (0.06 + (level - 1) * 0.004);
-  const cr = Math.round(g.r), cc = Math.round(g.c);
+  // ── Tile-based chase movement ──────────────────────────────
+  // Ghost moves toward g.targetR/C. On arrival, picks the next cell.
+  // This prevents the "snap→oscillate" bug.
+  const dR = g.targetR - g.r;
+  const dC = g.targetC - g.c;
 
-  // Only choose new direction when near a cell center
-  const atCenter = Math.abs(g.r - cr) < spd * 2 && Math.abs(g.c - cc) < spd * 2;
-  if (atCenter) {
-    const target = ghostTarget(g);
-    let best = null, bestDist = scared ? -Infinity : Infinity;
-    for (const d of DIRS) {
-      if (d.r === -g.dr && d.c === -g.dc) continue; // no reverse
-      const nr = cr + d.r, nc = cc + d.c;
-      if (isWall(nr, nc, true)) continue;
-      const dist = (nr - target.r)**2 + (nc - target.c)**2;
-      if (scared ? dist > bestDist : dist < bestDist) { bestDist = dist; best = d; }
+  if (Math.abs(dR) + Math.abs(dC) <= spd) {
+    // Arrived at target cell — snap, pick next
+    g.r = g.targetR;
+    g.c = g.targetC;
+    const dir = pickGhostDir(g);
+    if (dir) {
+      g.dr = dir.r; g.dc = dir.c;
+      g.targetR = g.r + dir.r;
+      g.targetC = g.c + dir.c;
     }
-    if (!best) {
-      for (const d of DIRS) {
-        const nr = cr + d.r, nc = cc + d.c;
-        if (!isWall(nr, nc, true)) { best = d; break; }
-      }
-    }
-    if (best) { g.dr = best.r; g.dc = best.c; }
-    // snap to cell center to prevent drift
-    g.r = cr; g.c = cc;
+  } else {
+    // Move toward target
+    if (Math.abs(dR) > 0) g.r += Math.sign(dR) * Math.min(spd, Math.abs(dR));
+    if (Math.abs(dC) > 0) g.c += Math.sign(dC) * Math.min(spd, Math.abs(dC));
   }
-
-  const w = wrap(g.r + g.dr * spd, g.c + g.dc * spd);
-  g.r = w.r; g.c = w.c;
 }
 
 function movePacman() {
@@ -427,9 +438,9 @@ function checkCollision() {
       if (scared && !g.eaten) {
         g.eaten = true;
         score += 200;
-        // reset ghost
-        const home = {r:14, c:11};
-        g.r = home.r; g.c = home.c;
+        // reset ghost back to house
+        g.r = 14; g.c = 11;
+        g.targetR = 14; g.targetC = 11;
         g.mode = 'house';
         g.houseTimer = 120;
         g.dr = 0; g.dc = 0;
@@ -449,11 +460,11 @@ function loseLife() {
   }
   // respawn
   initPacman();
-  ghosts.forEach(g => {
-    const home = {r:14, c: 11};
-    g.r = home.r; g.c = home.c;
+  ghosts.forEach((g, i) => {
+    g.r = 14; g.c = 11 + i;
+    g.targetR = 14; g.targetC = 11 + i;
     g.mode = 'house';
-    g.houseTimer = 60;
+    g.houseTimer = 60 + i * 80;
     g.dr = 0; g.dc = 0;
     g.eaten = false;
   });
@@ -656,39 +667,56 @@ function setDir(r, c) {
   if (phase !== 'play') return;
   pacman.nextDir = {r, c};
 }
-document.getElementById('btn-up').addEventListener('pointerdown', e => { e.preventDefault(); setDir(-1,0); });
-document.getElementById('btn-down').addEventListener('pointerdown', e => { e.preventDefault(); setDir(1,0); });
-document.getElementById('btn-left').addEventListener('pointerdown', e => { e.preventDefault(); setDir(0,-1); });
-document.getElementById('btn-right').addEventListener('pointerdown', e => { e.preventDefault(); setDir(0,1); });
 
-document.addEventListener('keydown', e => {
-  if      (e.key === 'ArrowUp'   ) { e.preventDefault(); setDir(-1,0); }
-  else if (e.key === 'ArrowDown' ) { e.preventDefault(); setDir(1,0); }
-  else if (e.key === 'ArrowLeft' ) { e.preventDefault(); setDir(0,-1); }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); setDir(0,1); }
+// D-pad — pointerdown for instant response on mobile (no 300ms click delay)
+['btn-up','btn-down','btn-left','btn-right'].forEach(id => {
+  const dirs = {
+    'btn-up':[-1,0], 'btn-down':[1,0],
+    'btn-left':[0,-1], 'btn-right':[0,1]
+  };
+  document.getElementById(id).addEventListener('pointerdown', e => {
+    e.preventDefault();
+    setDir(...dirs[id]);
+  });
 });
 
-// Swipe support
-let touchStartX, touchStartY;
-document.addEventListener('touchstart', e => {
-  touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
+// Keyboard
+document.addEventListener('keydown', e => {
+  const map = {
+    'ArrowUp':[-1,0], 'ArrowDown':[1,0],
+    'ArrowLeft':[0,-1], 'ArrowRight':[0,1],
+    'w':[-1,0], 's':[1,0], 'a':[0,-1], 'd':[0,1]
+  };
+  if (map[e.key]) { e.preventDefault(); setDir(...map[e.key]); }
+});
+
+// Swipe (canvas area only — avoid conflicting with D-pad)
+let swipeX, swipeY;
+cv.addEventListener('touchstart', e => {
+  swipeX = e.touches[0].clientX;
+  swipeY = e.touches[0].clientY;
 }, {passive:true});
-document.addEventListener('touchend', e => {
-  if (touchStartX === undefined) return;
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  const dy = e.changedTouches[0].clientY - touchStartY;
-  if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+cv.addEventListener('touchend', e => {
+  if (swipeX === undefined) return;
+  const dx = e.changedTouches[0].clientX - swipeX;
+  const dy = e.changedTouches[0].clientY - swipeY;
+  swipeX = swipeY = undefined;
+  if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return;
   if (Math.abs(dx) > Math.abs(dy)) setDir(0, dx > 0 ? 1 : -1);
   else setDir(dy > 0 ? 1 : -1, 0);
 }, {passive:true});
 
-document.getElementById('retry').addEventListener('click', () => {
+// Buttons — pointerdown for instant mobile response
+document.getElementById('retry').addEventListener('pointerdown', e => {
+  e.preventDefault();
   document.getElementById('ov').classList.remove('on');
+  lastT = -1; // reset timer to avoid first-frame speed burst
   start(1);
 });
-document.getElementById('start-btn').addEventListener('click', () => {
+document.getElementById('start-btn').addEventListener('pointerdown', e => {
+  e.preventDefault();
   document.getElementById('start-ov').style.display = 'none';
+  lastT = -1;
   start(1);
   requestAnimationFrame(gameLoop);
 });
