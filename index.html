@@ -285,7 +285,7 @@ html, body {
 
 <script>
 // 배포할 때마다 올려서 게임 링크의 캐시를 강제로 새로고침시킨다
-const APP_VERSION = '2026.06.07-1';
+const APP_VERSION = '2026.06.07-2';
 document.getElementById('version-tag').textContent = '버전 v' + APP_VERSION;
 document.querySelectorAll('.game-card').forEach(a => {
   a.href = a.getAttribute('href') + '?v=' + APP_VERSION;
