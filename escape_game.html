@@ -39,6 +39,28 @@ html, body {
   background:none; border:none; cursor:pointer; text-decoration:underline;
 }
 
+/* 난이도 선택 */
+.grade-picker {
+  display:flex; gap:12px; margin-bottom:10px;
+}
+.grade-btn {
+  flex:1; max-width:150px;
+  padding:14px 10px;
+  border:2px solid rgba(255,255,255,.1);
+  border-radius:18px;
+  background:rgba(255,255,255,.04);
+  color:#fff; cursor:pointer; text-align:center;
+  transition:border-color .15s, background .15s;
+}
+.grade-btn:active { transform:scale(.96); }
+.grade-btn .g-icon { font-size:34px; margin-bottom:6px; }
+.grade-btn .g-name { font-size:14px; font-weight:bold; }
+.grade-btn .g-desc { font-size:11px; color:#888; margin-top:4px; line-height:1.5; }
+.grade-btn.easy { border-color:rgba(74,222,128,.3); }
+.grade-btn.easy:active { background:rgba(74,222,128,.1); }
+.grade-btn.hard { border-color:rgba(167,139,250,.3); }
+.grade-btn.hard:active { background:rgba(167,139,250,.1); }
+
 /* ── 클리어/게임오버 화면 ── */
 #clear-screen { background:rgba(0,0,0,.92); }
 #over-screen  { background:rgba(0,0,0,.92); }
@@ -274,8 +296,19 @@ html, body {
 <div id="title-screen" class="screen active">
   <h1>🔐</h1>
   <h2>방탈출</h2>
-  <p>5개의 방에 숨겨진 단서를 찾고<br>퍼즐을 풀어 탈출하세요!<br>빠를수록 높은 점수를 얻습니다.</p>
-  <button class="btn-primary" id="start-btn">시작하기</button>
+  <p>5개의 방에 숨겨진 단서를 찾고<br>퍼즐을 풀어 탈출하세요!<br>난이도를 선택하세요.</p>
+  <div class="grade-picker">
+    <button class="grade-btn easy" onclick="selectGrade('easy')">
+      <div class="g-icon">🧒</div>
+      <div class="g-name">초등 1학년</div>
+      <div class="g-desc">그림·세기·순서<br>쉬운 퍼즐</div>
+    </button>
+    <button class="grade-btn hard" onclick="selectGrade('hard')">
+      <div class="g-icon">🎓</div>
+      <div class="g-name">초등 5학년</div>
+      <div class="g-desc">논리·수학·암호<br>도전 퍼즐</div>
+    </button>
+  </div>
   <button class="btn-secondary" onclick="location.href='index.html'">← 게임 허브</button>
 </div>
 
@@ -330,84 +363,170 @@ html, body {
 
 <script>
 // ────────────────────────────────────────────────
-// STAGE DEFINITIONS
+// PUZZLE POOLS
 // ────────────────────────────────────────────────
-const STAGES = [
+
+// ── 초등 1학년 문제 풀 (7개 중 5개 랜덤)
+const EASY_POOL = [
   {
-    id: 1,
     name: '🔑 잠긴 방',
-    art: '🐱🐶🐰',
-    artSub: '벽에 동물 그림이 그려져 있다',
+    art: '🐱🐶🐰', artSub: '벽에 동물 그림이 그려져 있다',
     clue: '벽화를 자세히 보니:\n"<span class="clue-highlight">🐱 고양이 3마리, 🐶 강아지 4마리, 🐰 토끼 2마리.\n동물 수를 순서대로 자물쇠에 입력하라!</span>"',
-    hint: '그림에 있는 동물 수를 순서대로 쓰면 됩니다. 고양이=3, 강아지=4, 토끼=2!',
-    kidHint: '고양이가 3마리야! 강아지가 4마리야! 토끼가 2마리야! 그 숫자를 순서대로 눌러봐: 3, 4, 2!',
-    type: 'digits',
-    digits: 3,
-    answer: [3, 4, 2],
-    explanation: '🐱 고양이 3마리 → 3, 🐶 강아지 4마리 → 4, 🐰 토끼 2마리 → 2. 자물쇠 코드: 3-4-2! 문이 열렸다! 🔓',
+    hint: '동물 수를 순서대로 쓰면 됩니다. 고양이=3, 강아지=4, 토끼=2!',
+    kidHint: '고양이가 3마리, 강아지가 4마리, 토끼가 2마리야! 3, 4, 2 순서대로 눌러봐!',
+    type: 'digits', digits: 3, answer: [3, 4, 2],
+    explanation: '🐱 고양이 3마리→3, 🐶 강아지 4마리→4, 🐰 토끼 2마리→2. 코드: 3-4-2! 🔓',
   },
   {
-    id: 2,
-    name: '📚 서재',
-    art: '📚🕯️🗺️',
-    artSub: '책과 촛불, 그리고 낡은 지도',
+    name: '🍎 과일 창고',
+    art: '🍎🍌🍇', artSub: '과일 상자가 쌓여 있다',
+    clue: '상자에 적힌 메모:\n"<span class="clue-highlight">🍎 사과 2개, 🍌 바나나 5개, 🍇 포도 3송이.\n개수를 순서대로 자물쇠에 입력하라!</span>"',
+    hint: '사과=2, 바나나=5, 포도=3. 순서대로 입력하세요!',
+    kidHint: '사과 2개, 바나나 5개, 포도 3개야! 2, 5, 3 눌러봐!',
+    type: 'digits', digits: 3, answer: [2, 5, 3],
+    explanation: '사과 2→바나나 5→포도 3. 코드: 2-5-3! 🍎',
+  },
+  {
+    name: '🌸 자연 정원',
+    art: '🌸☀️🍂❄️', artSub: '계절별 그림이 뒤섞여 있다',
+    clue: '안내판:\n"<span class="clue-highlight">계절을 올바른 순서로 정렬하라!\n보기: 여름☀️, 가을🍂, 봄🌸, 겨울❄️</span>"',
+    hint: '봄→여름→가을→겨울 순서로! 봄(🌸)부터 선택하세요.',
+    kidHint: '봄이 먼저야! 봄(🌸)→여름(☀️)→가을(🍂)→겨울(❄️) 순서로 눌러봐!',
+    type: 'order', items: ['☀️ 여름', '🍂 가을', '🌸 봄', '❄️ 겨울'],
+    answer: [2, 0, 1, 3],
+    explanation: '봄→여름→가을→겨울! 목록에서 봄(🌸)→여름(☀️)→가을(🍂)→겨울(❄️) 선택! 🌸',
+  },
+  {
+    name: '📚 수수께끼 방',
+    art: '📚🕯️', artSub: '책과 촛불이 있는 방',
     clue: '책장에서 쪽지를 발견했다:\n"<span class="clue-highlight">나는 숫자가 없지만 시간을 말한다.\n나는 소리도 없지만 움직인다.\n하루에 두 번 멈추는 것은?</span>"',
-    hint: '정답은 그림자! 그림자는 빛이 없으면 사라져서 밤에 두 번(해뜨기 전, 해진 후) 보이지 않아요.',
-    kidHint: '낮에 밖에 나가면 발 옆에 생기는 까만 것이야! 해가 있을 때만 보이고, 밤엔 사라지잖아. 시계? 바람? 아니야! 정답은 두 번째 보기야!',
-    type: 'choice',
-    question: '수수께끼의 정답은?',
-    choices: ['시계', '그림자', '바람', '달'],
-    answer: 1,
-    explanation: '정답은 그림자! 그림자는 시계 없이도 시간을 알려주고(해 위치로), 소리 없이 움직여요. 밤에는 빛이 없어서 사라지기 때문에 "하루에 두 번 멈춘다"고 했어요! 🌑',
+    hint: '정답은 그림자! 빛이 있어야 보이고, 밤에는 사라져요.',
+    kidHint: '낮에 밖에 나가면 발 옆에 생기는 까만 것! 해가 있을 때만 보이고 밤엔 사라지잖아. 두 번째 보기야!',
+    type: 'choice', question: '수수께끼의 정답은?',
+    choices: ['시계', '그림자', '바람', '달'], answer: 1,
+    explanation: '정답은 그림자! 해의 위치로 시간을 알 수 있고, 빛이 없는 밤엔 사라져요! 🌑',
   },
   {
-    id: 3,
-    name: '🔬 실험실',
-    art: '⚗️🧪🔬',
-    artSub: '색깔 액체가 담긴 시험관들',
-    clue: '실험 노트에 순서가 적혀 있다:\n"<span class="clue-highlight">무지개의 색을 역순으로 섞어라.\n(보라→파→초→노→주→빨) 순서로!</span>"',
-    hint: '무지개 역순: 보라, 파랑, 초록, 노랑, 주황, 빨강. 목록에 보이는 순서 그대로 선택하면 정답!',
-    kidHint: '무지개를 거꾸로 해봐! 보통은 빨-주-노-초-파-보 인데, 역순은 보-파-초-노-주-빨이야! 목록 맨 위 보라색부터 순서대로 선택해봐!',
-    type: 'order',
-    items: ['🟣 보라', '🔵 파랑', '🟢 초록', '🟡 노랑', '🟠 주황', '🔴 빨강'],
-    answer: [0, 1, 2, 3, 4, 5],
-    explanation: '무지개 정순: 빨강→주황→노랑→초록→파랑→보라. 역순: 보라→파랑→초록→노랑→주황→빨강! 목록이 이미 역순 순서로 되어 있었어요! 🌈',
+    name: '🌈 색깔 방',
+    art: '🌈🎨', artSub: '벽에 색색의 페인트 통들이',
+    clue: '칠판의 지시:\n"<span class="clue-highlight">무지개의 색을 거꾸로 정렬하라!\n무지개: 빨강→노랑→초록→파랑</span>"',
+    hint: '역순: 파랑→초록→노랑→빨강 순서로!',
+    kidHint: '무지개를 뒤집어봐! 빨-노-초-파를 반대로 하면 파-초-노-빨! 파랑(🔵)부터 눌러봐!',
+    type: 'order', items: ['🔴 빨강', '🟡 노랑', '🟢 초록', '🔵 파랑'],
+    answer: [3, 2, 1, 0],
+    explanation: '무지개 정순: 빨-노-초-파. 역순: 파→초→노→빨! 🌈',
   },
   {
-    id: 4,
-    name: '🎵 음악실',
-    art: '🎹🎶🎸',
-    artSub: '악기들이 가득한 방',
-    clue: '악보 위에 메모가 있다:\n"<span class="clue-highlight">도(1) 레(2) 미(3) 파(4) 솔(5)\n연주 순서: 솔-미-도-파-레\n각 음의 번호를 순서대로 쓰면?</span>"',
-    hint: '솔=5, 미=3, 도=1, 파=4, 레=2. 연주 순서 그대로 5-3-1-4-2!',
-    kidHint: '도=1, 레=2, 미=3, 파=4, 솔=5 로 외워봐! 악보에 솔-미-도-파-레 순서니까: 솔은 5, 미는 3, 도는 1, 파는 4, 레는 2. 5, 3, 1, 4, 2 를 눌러봐!',
-    type: 'digits',
-    digits: 5,
-    answer: [5, 3, 1, 4, 2],
-    explanation: '도(1)-레(2)-미(3)-파(4)-솔(5). 악보 연주 순서 솔-미-도-파-레를 숫자로 바꾸면 5-3-1-4-2! 🎵',
+    name: '⭐ 별자리 방',
+    art: '⭐🌙☀️', artSub: '천장에 그림들이 빛나고 있다',
+    clue: '벽에 적힌 메모:\n"<span class="clue-highlight">⭐별 3개 = 3, 🌙달 2개 = 2, ☀️해 1개 = 1.\n모두 더한 수를 자물쇠에 입력하라!</span>"',
+    hint: '3+2+1=6! 2자리로 입력: 0, 6',
+    kidHint: '별(3) + 달(2) + 해(1) = 6! 3+2+1=6이야! 자물쇠에 0, 6 눌러봐!',
+    type: 'digits', digits: 2, answer: [0, 6],
+    explanation: '⭐(3) + 🌙(2) + ☀️(1) = 6. 코드: 0-6! ✨',
   },
   {
-    id: 5,
-    name: '🚪 최종 관문',
-    art: '🔐✨',
-    artSub: '출구 앞 마지막 자물쇠',
-    clue: '마지막 자물쇠에 수수께끼가 적혀 있다:\n"<span class="clue-highlight">1번 방에서 처음 입력한 숫자와\n4번 방에서 처음 입력한 숫자를 더하라!</span>"',
-    hint: '1번방 코드 첫 자리: 3, 4번방 코드 첫 자리: 5. 3 + 5 = 8 → 자물쇠 코드는 0, 0, 8!',
-    kidHint: '1번방에서 처음 누른 숫자가 3이었어! 4번방에서 처음 누른 숫자가 5였어! 3 더하기 5는 8이야! 자물쇠에 0, 0, 8 눌러봐!',
-    type: 'digits',
-    digits: 3,
-    answer: [0, 0, 8],
-    explanation: '1번방 코드 첫 자리(3) + 4번방 코드 첫 자리(5) = 8. 마지막 자물쇠 코드: 0-0-8! 🎉 탈출 성공!',
+    name: '🐸 수수께끼 방',
+    art: '🐸🦆🐛', artSub: '동물 그림이 잔뜩 붙어있다',
+    clue: '쪽지의 수수께끼:\n"<span class="clue-highlight">나는 물에서도 살고 땅에서도 살아.\n봄에 노래를 부르고 겨울에 잠을 자.\n나는 누구?</span>"',
+    hint: '정답은 개구리! 봄에 개굴개굴 울고 겨울에 동면해요.',
+    kidHint: '봄에 "개굴개굴" 울고 물가에 사는 초록색 동물이야! 겨울엔 땅속에서 잠들어! 첫 번째 보기야!',
+    type: 'choice', question: '수수께끼의 주인공은?',
+    choices: ['개구리', '오리', '달팽이', '매미'], answer: 0,
+    explanation: '정답은 개구리! 물과 땅 양쪽에 살고(양서류), 봄에 울고 겨울에 동면해요! 🐸',
   },
 ];
+
+// ── 초등 5학년 문제 풀 (7개 중 5개 랜덤)
+const HARD_POOL = [
+  {
+    name: '🎵 음악실',
+    art: '🎹🎶🎸', artSub: '악기들이 가득한 방',
+    clue: '악보 위에 메모:\n"<span class="clue-highlight">도(1) 레(2) 미(3) 파(4) 솔(5)\n연주 순서: 솔-미-도-파-레\n각 음의 번호를 순서대로 쓰면?</span>"',
+    hint: '솔=5, 미=3, 도=1, 파=4, 레=2. 순서대로 5-3-1-4-2!',
+    kidHint: '도=1 레=2 미=3 파=4 솔=5! 악보 순서 솔-미-도-파-레 → 5, 3, 1, 4, 2!',
+    type: 'digits', digits: 5, answer: [5, 3, 1, 4, 2],
+    explanation: '도(1)-레(2)-미(3)-파(4)-솔(5). 연주 순서 솔-미-도-파-레 → 5-3-1-4-2! 🎵',
+  },
+  {
+    name: '📚 서재',
+    art: '📚🕯️🗺️', artSub: '책과 촛불, 그리고 낡은 지도',
+    clue: '책장에서 쪽지:\n"<span class="clue-highlight">나는 숫자가 없지만 시간을 말한다.\n나는 소리도 없지만 움직인다.\n하루에 두 번 멈추는 것은?</span>"',
+    hint: '정답은 그림자! 빛이 없으면 사라져서 밤에 두 번 보이지 않아요.',
+    kidHint: '낮에 밖에 나가면 발 옆에 생기는 까만 것! 해가 있을 때만 보여. 두 번째 보기야!',
+    type: 'choice', question: '수수께끼의 정답은?',
+    choices: ['시계', '그림자', '바람', '달'], answer: 1,
+    explanation: '정답은 그림자! 해 위치로 시간을 알 수 있고, 빛 없는 밤엔 사라져요! 🌑',
+  },
+  {
+    name: '🔬 실험실',
+    art: '⚗️🧪🔬', artSub: '색깔 액체가 담긴 시험관들',
+    clue: '실험 노트:\n"<span class="clue-highlight">무지개의 색을 역순으로 섞어라.\n(보라→파→초→노→주→빨) 순서로!</span>"',
+    hint: '역순: 보라→파랑→초록→노랑→주황→빨강. 목록 그대로 선택!',
+    kidHint: '무지개를 거꾸로! 보-파-초-노-주-빨 순서야! 보라색부터 눌러봐!',
+    type: 'order', items: ['🟣 보라', '🔵 파랑', '🟢 초록', '🟡 노랑', '🟠 주황', '🔴 빨강'],
+    answer: [0, 1, 2, 3, 4, 5],
+    explanation: '무지개 정순: 빨-주-노-초-파-보. 역순: 보→파→초→노→주→빨! 🌈',
+  },
+  {
+    name: '🔢 규칙의 방',
+    art: '📐🔢', artSub: '칠판에 숫자 패턴이 적혀 있다',
+    clue: '칠판의 수열 문제:\n"<span class="clue-highlight">2, 4, 8, 16, ?\n빈칸에 들어갈 숫자를 자물쇠에 입력하라!</span>"',
+    hint: '2의 배수 수열! 2×2=4, 4×2=8, 8×2=16, 16×2=32',
+    kidHint: '각 숫자가 2배씩 커지고 있어! 2→4→8→16→? 16×2=32! 자물쇠에 3, 2!',
+    type: 'digits', digits: 2, answer: [3, 2],
+    explanation: '2, 4, 8, 16 → 2배씩! 16×2=32. 코드: 3-2! 📐',
+  },
+  {
+    name: '👨 기억의 방',
+    art: '👨👦', artSub: '낡은 사진이 걸려 있다',
+    clue: '사진 뒤에 적힌 메모:\n"<span class="clue-highlight">동생은 지금 7살이다.\n형은 동생보다 5살 더 많다.\n형의 나이를 자물쇠에 입력하면?</span>"',
+    hint: '동생 7살 + 5살 = 12살! 자물쇠에 1, 2 입력!',
+    kidHint: '동생이 7살이고 형이 5살 더 많아! 7+5=12! 1, 2를 눌러봐!',
+    type: 'digits', digits: 2, answer: [1, 2],
+    explanation: '동생 7살 + 5살 차이 = 형은 12살! 코드: 1-2! 👦',
+  },
+  {
+    name: '🔭 과학실',
+    art: '🔭🌍⭐', artSub: '과학 포스터가 붙어 있다',
+    clue: '포스터의 질문:\n"<span class="clue-highlight">빛의 속도로 달려도 지구에서 약 8분이 걸리는 별은?\n그 별의 이름을 선택하라!</span>"',
+    hint: '8분 = 태양! 지구에서 태양까지 빛으로 약 8분 걸려요.',
+    kidHint: '매일 하늘에서 환하게 빛나는 그 별! 낮에 보이는 엄청나게 밝은 별! 두 번째 보기야!',
+    type: 'choice', question: '가장 가까운 별은?',
+    choices: ['북극성', '태양', '시리우스', '알파센타우리'], answer: 1,
+    explanation: '정답은 태양! 약 1억 5천만km 떨어져 있고 빛의 속도로 약 8분 걸려요. 태양도 별이에요! ☀️',
+  },
+  {
+    name: '🧩 암호 방',
+    art: '🧩🔐', artSub: '암호표가 벽에 붙어 있다',
+    clue: '암호표:\n"<span class="clue-highlight">A=1, B=2, C=3 ... Z=26\n암호: C · A · T\n알파벳 번호를 모두 더하면?</span>"',
+    hint: 'C=3, A=1, T=20. 3+1+20=24! 자물쇠에 2, 4!',
+    kidHint: 'C는 알파벳 3번째니까 3, A는 1번째니까 1, T는 20번째야! 3+1+20=24! 2, 4 눌러봐!',
+    type: 'digits', digits: 2, answer: [2, 4],
+    explanation: 'C=3, A=1, T=20. 3+1+20=24. 코드: 2-4! 🔐',
+  },
+];
+
+function pickStages(grade) {
+  const pool = grade === 'hard' ? HARD_POOL : EASY_POOL;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 5).map((st, i) => ({ ...st, id: i + 1 }));
+}
 
 const TIME_LIMIT = 600; // 10분
 
 // ── 상태
+let currentStages = [];
 let currentStage = 0;
 let elapsed = 0;
 let timerID = null;
 let gameActive = false;
+let selectedGrade = 'easy';
+
+function selectGrade(grade) {
+  selectedGrade = grade;
+  startGame();
+}
 
 const best = (() => { try { return parseInt(localStorage.getItem('escape_best') || '0'); } catch(e) { return 0; } })();
 
@@ -460,6 +579,7 @@ function saveScore(sc) {
 
 // ── 게임 시작
 function startGame() {
+  currentStages = pickStages(selectedGrade);
   currentStage = 0;
   gameActive = true;
   clearInterval(timerID);
@@ -491,8 +611,8 @@ function showGameOver() {
 // STAGE RENDERER
 // ────────────────────────────────────────────────
 function renderStage() {
-  const st = STAGES[currentStage];
-  document.getElementById('stage-info').textContent = `STAGE ${st.id} / ${STAGES.length}`;
+  const st = currentStages[currentStage];
+  document.getElementById('stage-info').textContent = `STAGE ${st.id} / ${currentStages.length}`;
   document.getElementById('stage-name').textContent = st.name;
   document.getElementById('hint-text').textContent = st.hint;
   document.getElementById('kid-hint-text').textContent = st.kidHint || '';
@@ -687,7 +807,7 @@ function showExplanation(view, st) {
   card.innerHTML = `<h3>📖 해설</h3><p>${st.explanation}</p>`;
   const nextBtn = document.createElement('button');
   nextBtn.className = 'next-stage-btn';
-  nextBtn.textContent = currentStage + 1 >= STAGES.length ? '🎉 탈출하기!' : '다음 방으로 →';
+  nextBtn.textContent = currentStage + 1 >= currentStages.length ? '🎉 탈출하기!' : '다음 방으로 →';
   nextBtn.addEventListener('pointerdown', () => nextStage());
   card.appendChild(nextBtn);
   view.appendChild(card);
@@ -697,7 +817,7 @@ function showExplanation(view, st) {
 // ── 다음 스테이지 or 클리어
 function nextStage() {
   currentStage++;
-  if (currentStage >= STAGES.length) {
+  if (currentStage >= currentStages.length) {
     showClear();
   } else {
     document.getElementById('room-view').scrollIntoView({ behavior:'smooth' });

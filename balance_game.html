@@ -125,8 +125,14 @@ function start() {
   updateHUD();
 }
 
+let lastTapTime = 0;
+const TAP_COOLDOWN = 500; // ms - 스팸 클릭 방지
+
 function tap() {
   if (phase !== 'play') return;
+  const now = performance.now();
+  if (now - lastTapTime < TAP_COOLDOWN) return;
+  lastTapTime = now;
   phase = 'drop';
 
   const top = stack[stack.length - 1];

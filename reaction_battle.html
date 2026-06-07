@@ -260,7 +260,7 @@ html, body {
 </div>
 
 <!-- 5. 신호! 눌러!! -->
-<div id="screen-flash" class="screen" ontouchstart="onTap()" onclick="onTap()">
+<div id="screen-flash" class="screen">
   <h1>⚡ 눌러!</h1>
   <p id="flash-sub">화면을 탭하세요!</p>
 </div>
@@ -547,23 +547,29 @@ function handleState(room) {
 }
 
 // ── 탭 처리 ────────────────────────────────────
+// pointerdown 으로만 바인딩 (touchstart+click 이중발화 방지)
+document.getElementById('screen-flash').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  onTap();
+});
+
 async function onTap() {
   const screen = document.getElementById('screen-flash');
   if (!screen.classList.contains('active')) return;
 
+  // ★ async 이전에 먼저 가드 - 연속 누르기 완전 차단
+  if (hasTapped) return;
+  hasTapped = true;
+
   const now = Date.now();
 
-  // 아직 flash 상태가 아니면 얼리
+  // flash 상태 확인 (얼리 프레스 감지)
   const snap = await roomRef.child('state').once('value');
   if (snap.val() !== 'flash') {
     screen.classList.add('early');
     document.getElementById('flash-sub').textContent = '❌ 너무 빨라요!';
-    hasTapped = true;
     return;
   }
-
-  if (hasTapped) return;
-  hasTapped = true;
 
   const reactionMs = now - flashStartTime;
   screen.classList.add('tapped');
@@ -571,7 +577,6 @@ async function onTap() {
 
   await roomRef.child('taps/' + myId).set(reactionMs);
 
-  // 호스트가 모든 탭 확인 후 결과 처리
   if (isHost) {
     checkAllTapped();
   }
