@@ -90,9 +90,9 @@ const PALETTE = [
 
 // ── 상태
 let stack, mv, dp, score, tilt, cam, best, phase;
-best = +localStorage.getItem('bstack_best') || 0;
+best = +((() => { try { return localStorage.getItem('bstack_best'); } catch(e) { return 0; } })()) || 0;
 
-const playerName = localStorage.getItem('gameName') || '';
+const playerName = (() => { try { return localStorage.getItem('gameName') || ''; } catch(e) { return ''; } })();
 
 function col(i) { return PALETTE[i % PALETTE.length]; }
 
@@ -115,7 +115,7 @@ function updateCam() {
 
 function resetMv() {
   const top = stack[stack.length - 1];
-  mv = { cx: W / 2, w: Math.max(top.w, 16), dir: 1, spd: 1.8 + score * 0.07 };
+  mv = { cx: W / 2, w: Math.max(top.w, 16), dir: 1, spd: 1.8 + score * 0.04 };
 }
 
 function start() {

@@ -309,18 +309,23 @@ function moveGhost(g) {
     return;
   }
   if (g.mode === 'exit') {
-    // Move towards exit row
-    const exitR = 11, exitC = 14;
-    const cr = Math.round(g.r), cc = Math.round(g.c);
-    if (cr === exitR && cc === exitC) { g.mode = 'chase'; return; }
-    // simple pathfinding: move toward exit
-    const dr = exitR - cr, dc = exitC - cc;
-    if (Math.abs(dr) > Math.abs(dc)) {
-      const nr = cr + Math.sign(dr);
-      if (!isWall(nr, cc, true, true)) { g.r = nr; } else { g.c += Math.sign(dc) || 1; }
+    // Exit path: slide to col 13 (door center) first, then move straight up to row 11
+    const exitC = 13, exitR = 11;
+    const spd = 0.06;
+    if (Math.abs(g.c - exitC) > 0.1) {
+      // Step 1: align column
+      g.c += Math.sign(exitC - g.c) * Math.min(spd, Math.abs(g.c - exitC));
     } else {
-      const nc = cc + Math.sign(dc);
-      if (!isWall(cr, nc, true, true)) { g.c = nc; } else { g.r += Math.sign(dr) || 1; }
+      g.c = exitC;
+      if (g.r > exitR + 0.1) {
+        // Step 2: move upward
+        g.r -= Math.min(spd, g.r - exitR);
+      } else {
+        // Arrived
+        g.r = exitR; g.c = exitC;
+        g.mode = 'chase';
+        g.dr = 0; g.dc = -1; // head left into main maze
+      }
     }
     return;
   }
@@ -617,13 +622,15 @@ function draw() {
 }
 
 // ── GAME LOOP
-let lastT = 0;
+let lastT = -1;
 let tickAcc = 0;
 const TICK = 1000/60;
 
 function gameLoop(ts) {
   requestAnimationFrame(gameLoop);
-  const dt = ts - lastT; lastT = ts;
+  if (lastT < 0) { lastT = ts; }           // 첫 프레임은 skip
+  const dt = Math.min(ts - lastT, 100);    // 최대 100ms cap (탭 전환 후 급증 방지)
+  lastT = ts;
   tickAcc += dt;
   while (tickAcc >= TICK) {
     tickAcc -= TICK;

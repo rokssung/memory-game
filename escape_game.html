@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🔐 방탈출</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100%; min-height:100%;
+  background:#0d0d1a;
+  font-family:'Arial',sans-serif;
+  color:#fff;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* ── 공통 오버레이 ── */
+.screen {
+  display:none; position:fixed; inset:0;
+  flex-direction:column; align-items:center; justify-content:center;
+  padding:24px; text-align:center; z-index:10;
+}
+.screen.active { display:flex; }
+
+/* ── 타이틀 화면 ── */
+#title-screen { background:#0d0d1a; }
+#title-screen h1 { font-size:60px; margin-bottom:6px; }
+#title-screen h2 { font-size:26px; color:#a78bfa; margin-bottom:8px; }
+#title-screen p  { color:#555; font-size:14px; line-height:1.7; max-width:300px; margin-bottom:28px; }
+.btn-primary {
+  padding:14px 48px; border:none; border-radius:24px;
+  background:linear-gradient(135deg,#6366f1,#a855f7);
+  color:#fff; font-size:18px; font-weight:bold; cursor:pointer;
+  box-shadow:0 0 30px rgba(139,92,246,.4);
+}
+.btn-secondary {
+  margin-top:10px; color:#444; font-size:13px;
+  background:none; border:none; cursor:pointer; text-decoration:underline;
+}
+
+/* ── 클리어/게임오버 화면 ── */
+#clear-screen { background:rgba(0,0,0,.92); }
+#over-screen  { background:rgba(0,0,0,.92); }
+#clear-screen h1 { font-size:52px; }
+#over-screen h1  { font-size:52px; }
+.result-title { font-size:26px; font-weight:bold; margin:10px 0 4px; }
+.result-time  { color:#a78bfa; font-size:20px; }
+.result-best  { color:#444; font-size:13px; margin-bottom:24px; }
+
+/* ── 게임 화면 ── */
+#game-screen {
+  display:none; position:fixed; inset:0;
+  background:#0d0d1a; overflow-y:auto;
+  flex-direction:column;
+}
+#game-screen.active { display:flex; }
+
+/* HUD */
+#hud {
+  position:sticky; top:0; z-index:5;
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 20px;
+  background:rgba(13,13,26,.95);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+#stage-info { font-size:13px; color:#888; letter-spacing:1px; }
+#stage-name { font-size:17px; font-weight:bold; color:#c4b5fd; }
+#timer-display { font-size:22px; font-weight:bold; color:#f1c40f; font-variant-numeric:tabular-nums; }
+#hint-btn {
+  padding:6px 14px; border:none; border-radius:14px;
+  background:rgba(241,196,15,.12); border:1px solid rgba(241,196,15,.3);
+  color:#f1c40f; font-size:12px; cursor:pointer;
+}
+
+/* 방 */
+#room-view {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; padding:16px 16px 32px;
+  gap:14px; max-width:480px; margin:0 auto; width:100%;
+}
+
+/* 방 그림 */
+.room-art {
+  width:100%; max-width:360px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:20px;
+  padding:20px;
+  font-size:80px; text-align:center;
+  line-height:1.2;
+  min-height:140px;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:8px;
+}
+.room-art .room-sub { font-size:13px; color:#555; margin-top:4px; }
+
+/* 단서 카드 */
+.clue-card {
+  width:100%; max-width:360px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:16px 18px;
+}
+.clue-card h3 { font-size:13px; color:#888; letter-spacing:1px; margin-bottom:8px; }
+.clue-text { font-size:15px; color:#ddd; line-height:1.6; }
+.clue-highlight { color:#fbbf24; font-weight:bold; }
+
+/* 퍼즐 영역 */
+.puzzle-area {
+  width:100%; max-width:360px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:20px 18px;
+}
+.puzzle-area h3 { font-size:13px; color:#888; letter-spacing:1px; margin-bottom:14px; }
+
+/* 숫자 자물쇠 */
+.digit-lock {
+  display:flex; gap:10px; justify-content:center; margin-bottom:14px;
+}
+.digit-slot {
+  width:52px; height:64px;
+  background:rgba(0,0,0,.4);
+  border:2px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:4px;
+}
+.digit-slot .digit-val {
+  font-size:26px; font-weight:bold; color:#fff;
+  min-width:24px; text-align:center;
+}
+.digit-slot button {
+  background:rgba(255,255,255,.08);
+  border:none; color:#fff; width:36px; height:20px;
+  border-radius:6px; font-size:14px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.digit-slot button:active { background:rgba(255,255,255,.2); }
+
+/* 선택지 버튼 */
+.choice-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.choice-btn {
+  padding:14px 10px; border:2px solid rgba(255,255,255,.1);
+  border-radius:14px; background:rgba(255,255,255,.04);
+  color:#ddd; font-size:15px; cursor:pointer; text-align:center;
+  transition:border-color .15s, background .15s;
+}
+.choice-btn:active { background:rgba(255,255,255,.12); }
+.choice-btn.selected { border-color:#a78bfa; background:rgba(167,139,250,.12); color:#c4b5fd; }
+.choice-btn.wrong    { border-color:#f43f5e; background:rgba(244,63,94,.08); animation:shake .3s; }
+.choice-btn.correct  { border-color:#22c55e; background:rgba(34,197,94,.12); }
+
+/* 순서 맞추기 */
+.order-list { display:flex; flex-direction:column; gap:8px; }
+.order-item {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 14px;
+  background:rgba(255,255,255,.05);
+  border:2px solid rgba(255,255,255,.1);
+  border-radius:12px; cursor:pointer;
+  transition:border-color .15s;
+}
+.order-item.selected { border-color:#a78bfa; }
+.order-item .order-rank {
+  width:28px; height:28px; border-radius:8px;
+  background:rgba(167,139,250,.2);
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:bold; color:#a78bfa;
+}
+.order-item .order-label { font-size:15px; color:#ddd; }
+
+/* 제출 버튼 */
+.submit-btn {
+  width:100%; padding:14px;
+  border:none; border-radius:14px;
+  background:linear-gradient(135deg,#6366f1,#a855f7);
+  color:#fff; font-size:16px; font-weight:bold;
+  cursor:pointer; margin-top:12px;
+  transition:opacity .15s;
+}
+.submit-btn:disabled { opacity:.4; cursor:default; }
+.submit-btn:active:not(:disabled) { opacity:.85; }
+
+/* 피드백 */
+.feedback {
+  text-align:center; font-size:14px;
+  min-height:20px; margin-top:8px;
+}
+.feedback.ok  { color:#22c55e; }
+.feedback.err { color:#f43f5e; }
+
+/* 힌트 모달 */
+#hint-modal {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.7);
+  align-items:flex-end; justify-content:center;
+  z-index:30;
+}
+#hint-modal.on { display:flex; }
+.hint-box {
+  background:#1a1a2e;
+  border-radius:24px 24px 0 0;
+  padding:24px 24px 40px;
+  max-width:480px; width:100%;
+}
+.hint-box h3 { font-size:16px; color:#f1c40f; margin-bottom:12px; }
+.hint-box p  { color:#aaa; font-size:14px; line-height:1.7; }
+.hint-close {
+  margin-top:16px; width:100%; padding:12px;
+  border:none; border-radius:14px;
+  background:rgba(255,255,255,.08); color:#fff;
+  font-size:15px; cursor:pointer;
+}
+
+@keyframes shake {
+  0%,100%{ transform:translateX(0); }
+  25%    { transform:translateX(-6px); }
+  75%    { transform:translateX(6px); }
+}
+</style>
+</head>
+<body>
+
+<!-- 타이틀 화면 -->
+<div id="title-screen" class="screen active">
+  <h1>🔐</h1>
+  <h2>방탈출</h2>
+  <p>5개의 방에 숨겨진 단서를 찾고<br>퍼즐을 풀어 탈출하세요!<br>빠를수록 높은 점수를 얻습니다.</p>
+  <button class="btn-primary" id="start-btn">시작하기</button>
+  <button class="btn-secondary" onclick="location.href='index.html'">← 게임 허브</button>
+</div>
+
+<!-- 게임 화면 -->
+<div id="game-screen">
+  <div id="hud">
+    <div>
+      <div id="stage-info">STAGE</div>
+      <div id="stage-name">--</div>
+    </div>
+    <div id="timer-display">00:00</div>
+    <button id="hint-btn">💡 힌트</button>
+  </div>
+  <div id="room-view"></div>
+</div>
+
+<!-- 힌트 모달 -->
+<div id="hint-modal">
+  <div class="hint-box">
+    <h3>💡 힌트</h3>
+    <p id="hint-text"></p>
+    <button class="hint-close" id="hint-close">닫기</button>
+  </div>
+</div>
+
+<!-- 클리어 화면 -->
+<div id="clear-screen" class="screen">
+  <h1>🎉</h1>
+  <div class="result-title">탈출 성공!</div>
+  <div class="result-time" id="clear-time"></div>
+  <div class="result-best" id="clear-best"></div>
+  <button class="btn-primary" id="retry-btn" style="margin-top:8px">다시하기</button>
+  <button class="btn-secondary" onclick="location.href='index.html'">← 게임 허브</button>
+</div>
+
+<!-- 게임오버 화면 -->
+<div id="over-screen" class="screen">
+  <h1>😅</h1>
+  <div class="result-title">시간 초과!</div>
+  <div class="result-time">제한 시간을 초과했어요</div>
+  <div class="result-best" id="over-best"></div>
+  <button class="btn-primary" id="retry-btn2" style="margin-top:24px">다시하기</button>
+  <button class="btn-secondary" onclick="location.href='index.html'">← 게임 허브</button>
+</div>
+
+<script>
+// ────────────────────────────────────────────────
+// STAGE DEFINITIONS
+// ────────────────────────────────────────────────
+const STAGES = [
+  {
+    id: 1,
+    name: '🔑 잠긴 방',
+    art: '🚪',
+    artSub: '낡은 나무 문이 잠겨 있다',
+    clue: '벽에 적힌 메모가 보인다:\n"<span class="clue-highlight">해가 뜨는 방향은 동쪽, 그 반대는 서쪽.\n시계의 동쪽은 3, 서쪽은 9.\n그 사이 정중앙을 더하면?</span>"',
+    hint: '시계에서 동쪽(3)과 서쪽(9)의 정중앙은 12와 6이에요. 3+9=12, 두 숫자를 더해보세요.',
+    type: 'digits',
+    digits: 3,
+    answer: [1, 2, 0],  // 3+9=12, 그 사이 정중앙: 12+6=18? 아니면 단순히 12 → 1,2,0?
+                         // 힌트 재확인: 3+9=12 → 자물쇠 코드 1,2,0
+  },
+  {
+    id: 2,
+    name: '📚 서재',
+    art: '📚🕯️🗺️',
+    artSub: '책과 촛불, 그리고 낡은 지도',
+    clue: '책장에서 쪽지를 발견했다:\n"<span class="clue-highlight">나는 숫자가 없지만 시간을 말한다.\n나는 소리도 없지만 움직인다.\n하루에 두 번 멈추는 것은?</span>"',
+    hint: '그림자입니다! 정답 선택지에서 그림자와 관련된 답을 찾아보세요.',
+    type: 'choice',
+    question: '수수께끼의 정답은?',
+    choices: ['시계', '그림자', '바람', '달'],
+    answer: 1, // 그림자
+  },
+  {
+    id: 3,
+    name: '🔬 실험실',
+    art: '⚗️🧪🔬',
+    artSub: '색깔 액체가 담긴 시험관들',
+    clue: '실험 노트에 순서가 적혀 있다:\n"<span class="clue-highlight">무지개의 색을 역순으로 섞어라.\n보라→남→파→초→노→주→빨</span>"',
+    hint: '무지개 역순: 보라, 남색, 파랑, 초록, 노랑, 주황, 빨강. 시험관을 이 순서로 정렬하세요.',
+    type: 'order',
+    items: ['🟣 보라', '🔵 파랑', '🟢 초록', '🟡 노랑', '🟠 주황', '🔴 빨강'],
+    answer: [0, 1, 2, 3, 4, 5], // 그대로가 정답 (보라→파→초→노→주→빨, 남색 제외 표시)
+  },
+  {
+    id: 4,
+    name: '🎵 음악실',
+    art: '🎹🎶🎸',
+    artSub: '악기들이 가득한 방',
+    clue: '악보 위에 메모가 있다:\n"<span class="clue-highlight">도(1) 레(2) 미(3) 파(4) 솔(5)\n연주 순서: 솔-미-도-파-레\n각 음의 번호를 순서대로 쓰면?</span>"',
+    hint: '솔=5, 미=3, 도=1, 파=4, 레=2. 순서대로 쓰면 5-3-1-4-2 → 자물쇠는 5자리!',
+    type: 'digits',
+    digits: 5,
+    answer: [5, 3, 1, 4, 2],
+  },
+  {
+    id: 5,
+    name: '🚪 최종 관문',
+    art: '🔐✨',
+    artSub: '출구 앞 마지막 자물쇠',
+    clue: '지금까지 지나온 방의 번호를 모두 더하면?\n<span class="clue-highlight">1번 방의 코드 첫 자리 + 2번 방 정답 번호(0부터) + 3번 방 첫 순서 색 번호(0부터) + 4번 방 코드 첫 자리</span>',
+    hint: '1번:1, 2번:1(그림자=index 1), 3번:0(보라=index 0), 4번:5. 합계 = 1+1+0+5 = 7. 자물쇠는 0,0,7.',
+    type: 'digits',
+    digits: 3,
+    answer: [0, 0, 7],
+  },
+];
+
+const TIME_LIMIT = 600; // 10분
+
+// ── 상태
+let currentStage = 0;
+let elapsed = 0;
+let timerID = null;
+let gameActive = false;
+
+const best = (() => { try { return parseInt(localStorage.getItem('escape_best') || '0'); } catch(e) { return 0; } })();
+
+// ── 화면 전환
+function showScreen(id) {
+  ['title-screen','game-screen','clear-screen','over-screen'].forEach(s => {
+    const el = document.getElementById(s);
+    el.classList.remove('active');
+  });
+  document.getElementById(id).classList.add('active');
+}
+
+// ── 타이머
+function startTimer() {
+  elapsed = 0;
+  timerID = setInterval(() => {
+    elapsed++;
+    updateTimerDisplay();
+    if (elapsed >= TIME_LIMIT) {
+      clearInterval(timerID);
+      gameActive = false;
+      showGameOver();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(elapsed / 60).toString().padStart(2,'0');
+  const s = (elapsed % 60).toString().padStart(2,'0');
+  document.getElementById('timer-display').textContent = m + ':' + s;
+}
+
+function calcScore() {
+  // 남은 시간이 많을수록 고득점
+  return Math.max(0, TIME_LIMIT - elapsed) * 10;
+}
+
+function saveScore(sc) {
+  try {
+    const prev = parseInt(localStorage.getItem('escape_best') || '0');
+    if (sc > prev) localStorage.setItem('escape_best', sc);
+    const name = (() => { try { return localStorage.getItem('gameName') || '?'; } catch(e){ return '?'; } })();
+    const key = 'escape_rank';
+    const ranks = JSON.parse((() => { try { return localStorage.getItem(key) || '[]'; } catch(e){ return '[]'; } })());
+    ranks.push({ name, score: sc, time: elapsed, date: new Date().toLocaleDateString('ko-KR') });
+    ranks.sort((a,b) => b.score - a.score);
+    try { localStorage.setItem(key, JSON.stringify(ranks.slice(0,10))); } catch(e) {}
+  } catch(e) {}
+}
+
+// ── 게임 시작
+function startGame() {
+  currentStage = 0;
+  gameActive = true;
+  clearInterval(timerID);
+  showScreen('game-screen');
+  startTimer();
+  renderStage();
+}
+
+function showClear() {
+  clearInterval(timerID);
+  gameActive = false;
+  const sc = calcScore();
+  saveScore(sc);
+  const m = Math.floor(elapsed / 60).toString().padStart(2,'0');
+  const s = (elapsed % 60).toString().padStart(2,'0');
+  const bestNow = (() => { try { return parseInt(localStorage.getItem('escape_best') || '0'); } catch(e){ return 0; } })();
+  document.getElementById('clear-time').textContent = `클리어 시간: ${m}:${s}  점수: ${sc}점`;
+  document.getElementById('clear-best').textContent = `최고 점수: ${bestNow}점`;
+  showScreen('clear-screen');
+}
+
+function showGameOver() {
+  const bestNow = (() => { try { return parseInt(localStorage.getItem('escape_best') || '0'); } catch(e){ return 0; } })();
+  document.getElementById('over-best').textContent = `최고 점수: ${bestNow}점`;
+  showScreen('over-screen');
+}
+
+// ────────────────────────────────────────────────
+// STAGE RENDERER
+// ────────────────────────────────────────────────
+function renderStage() {
+  const st = STAGES[currentStage];
+  document.getElementById('stage-info').textContent = `STAGE ${st.id} / ${STAGES.length}`;
+  document.getElementById('stage-name').textContent = st.name;
+  document.getElementById('hint-text').textContent = st.hint;
+
+  const view = document.getElementById('room-view');
+  view.innerHTML = '';
+
+  // 방 아트
+  const art = document.createElement('div');
+  art.className = 'room-art';
+  art.innerHTML = `<div>${st.art}</div><div class="room-sub">${st.artSub}</div>`;
+  view.appendChild(art);
+
+  // 단서
+  const clue = document.createElement('div');
+  clue.className = 'clue-card';
+  clue.innerHTML = `<h3>🔍 단서</h3><div class="clue-text">${st.clue.replace(/\n/g,'<br>')}</div>`;
+  view.appendChild(clue);
+
+  // 퍼즐
+  if (st.type === 'digits') renderDigitPuzzle(view, st);
+  else if (st.type === 'choice') renderChoicePuzzle(view, st);
+  else if (st.type === 'order') renderOrderPuzzle(view, st);
+}
+
+// ── 숫자 자물쇠 퍼즐
+function renderDigitPuzzle(view, st) {
+  const area = document.createElement('div');
+  area.className = 'puzzle-area';
+  area.innerHTML = '<h3>🔒 자물쇠</h3>';
+
+  const values = Array(st.digits).fill(0);
+  const lock = document.createElement('div');
+  lock.className = 'digit-lock';
+
+  values.forEach((_, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'digit-slot';
+    const up = document.createElement('button');
+    up.textContent = '▲';
+    const val = document.createElement('div');
+    val.className = 'digit-val';
+    val.textContent = '0';
+    const dn = document.createElement('button');
+    dn.textContent = '▼';
+    up.onclick = () => { values[i] = (values[i]+1)%10; val.textContent = values[i]; };
+    dn.onclick = () => { values[i] = (values[i]+9)%10; val.textContent = values[i]; };
+    slot.appendChild(up); slot.appendChild(val); slot.appendChild(dn);
+    lock.appendChild(slot);
+  });
+  area.appendChild(lock);
+
+  const fb = document.createElement('div');
+  fb.className = 'feedback';
+  const btn = document.createElement('button');
+  btn.className = 'submit-btn';
+  btn.textContent = '🔓 열기';
+  btn.onclick = () => {
+    const correct = st.answer.every((v, i) => v === values[i]);
+    if (correct) {
+      fb.textContent = '✅ 정답!';
+      fb.className = 'feedback ok';
+      btn.disabled = true;
+      setTimeout(() => nextStage(), 800);
+    } else {
+      fb.textContent = '❌ 틀렸어요. 다시 시도해보세요.';
+      fb.className = 'feedback err';
+    }
+  };
+  area.appendChild(btn);
+  area.appendChild(fb);
+  view.appendChild(area);
+}
+
+// ── 선택지 퍼즐
+function renderChoicePuzzle(view, st) {
+  const area = document.createElement('div');
+  area.className = 'puzzle-area';
+  area.innerHTML = `<h3>❓ ${st.question}</h3>`;
+
+  const grid = document.createElement('div');
+  grid.className = 'choice-grid';
+  let selected = null;
+  const fb = document.createElement('div');
+  fb.className = 'feedback';
+
+  st.choices.forEach((ch, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = ch;
+    btn.onclick = () => {
+      if (!gameActive) return;
+      document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selected = i;
+      if (i === st.answer) {
+        btn.classList.add('correct');
+        fb.textContent = '✅ 정답!'; fb.className = 'feedback ok';
+        setTimeout(() => nextStage(), 800);
+      } else {
+        btn.classList.add('wrong');
+        fb.textContent = '❌ 틀렸어요!'; fb.className = 'feedback err';
+        setTimeout(() => { btn.classList.remove('wrong','selected'); selected=null; fb.textContent=''; fb.className='feedback'; }, 600);
+      }
+    };
+    grid.appendChild(btn);
+  });
+  area.appendChild(grid);
+  area.appendChild(fb);
+  view.appendChild(area);
+}
+
+// ── 순서 맞추기 퍼즐
+function renderOrderPuzzle(view, st) {
+  const area = document.createElement('div');
+  area.className = 'puzzle-area';
+  area.innerHTML = '<h3>🔢 올바른 순서로 선택하세요</h3>';
+
+  const items = [...st.items]; // display order
+  const playerOrder = [];
+  const list = document.createElement('div');
+  list.className = 'order-list';
+  const fb = document.createElement('div');
+  fb.className = 'feedback';
+  const btn = document.createElement('button');
+  btn.className = 'submit-btn';
+  btn.textContent = '✅ 순서 확인';
+  btn.disabled = true;
+
+  const itemEls = items.map((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'order-item';
+    el.dataset.idx = i;
+    const rank = document.createElement('div');
+    rank.className = 'order-rank';
+    rank.textContent = '-';
+    const label = document.createElement('div');
+    label.className = 'order-label';
+    label.textContent = item;
+    el.appendChild(rank);
+    el.appendChild(label);
+    el.onclick = () => {
+      if (playerOrder.includes(i)) {
+        // deselect
+        const pos = playerOrder.indexOf(i);
+        playerOrder.splice(pos, 1);
+        el.classList.remove('selected');
+        // re-rank remaining
+        itemEls.forEach((e, idx) => {
+          const p = playerOrder.indexOf(idx);
+          e.querySelector('.order-rank').textContent = p >= 0 ? p+1 : '-';
+        });
+      } else {
+        playerOrder.push(i);
+        el.classList.add('selected');
+        rank.textContent = playerOrder.length;
+      }
+      btn.disabled = playerOrder.length !== items.length;
+    };
+    list.appendChild(el);
+    return el;
+  });
+
+  btn.onclick = () => {
+    const correct = playerOrder.every((v, i) => v === st.answer[i]);
+    if (correct) {
+      fb.textContent = '✅ 정답!'; fb.className = 'feedback ok';
+      btn.disabled = true;
+      setTimeout(() => nextStage(), 800);
+    } else {
+      fb.textContent = '❌ 순서가 틀렸어요. 다시 선택해보세요.';
+      fb.className = 'feedback err';
+      // reset
+      playerOrder.length = 0;
+      itemEls.forEach(e => { e.classList.remove('selected'); e.querySelector('.order-rank').textContent = '-'; });
+      btn.disabled = true;
+    }
+  };
+
+  area.appendChild(list);
+  area.appendChild(btn);
+  area.appendChild(fb);
+  view.appendChild(area);
+}
+
+// ── 다음 스테이지 or 클리어
+function nextStage() {
+  currentStage++;
+  if (currentStage >= STAGES.length) {
+    showClear();
+  } else {
+    document.getElementById('room-view').scrollIntoView({ behavior:'smooth' });
+    setTimeout(() => renderStage(), 200);
+  }
+}
+
+// ── 힌트
+document.getElementById('hint-btn').addEventListener('click', () => {
+  document.getElementById('hint-modal').classList.add('on');
+});
+document.getElementById('hint-close').addEventListener('click', () => {
+  document.getElementById('hint-modal').classList.remove('on');
+});
+document.getElementById('hint-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('hint-modal'))
+    document.getElementById('hint-modal').classList.remove('on');
+});
+
+// ── 버튼
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('retry-btn').addEventListener('click', startGame);
+document.getElementById('retry-btn2').addEventListener('click', startGame);
+</script>
+</body>
+</html>

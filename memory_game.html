@@ -473,7 +473,7 @@ function saveMemRanking(name, result) {
     if (a.grade !== b.grade) return ['S','A','B','C'].indexOf(a.grade) - ['S','A','B','C'].indexOf(b.grade);
     return a.seconds - b.seconds;
   });
-  localStorage.setItem(RANK_KEY(lv), JSON.stringify(list.slice(0, 10)));
+  try { localStorage.setItem(RANK_KEY(lv), JSON.stringify(list.slice(0, 10))); } catch(e) {}
 }
 let currentRankLevel = 'easy';
 
@@ -655,7 +655,7 @@ function gameComplete() {
   document.getElementById('res-grade').textContent = grade;
 
   // localStorage에 이름 저장되어 있으면 이름 선택 스킵
-  const savedName = localStorage.getItem('gameName');
+  const savedName = (() => { try { return localStorage.getItem('gameName'); } catch(e) { return null; } })();
   setTimeout(() => {
     if (savedName) {
       saveMemRanking(savedName, pendingResult);

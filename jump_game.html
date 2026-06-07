@@ -99,10 +99,12 @@ function getRankings() {
   catch { return []; }
 }
 function saveRanking(name, sc) {
-  const list = getRankings();
-  list.push({ name, score: sc, date: new Date().toLocaleDateString('ko-KR') });
-  list.sort((a, b) => b.score - a.score);
-  localStorage.setItem('jumpHeroRank', JSON.stringify(list.slice(0, 10)));
+  try {
+    const list = getRankings();
+    list.push({ name, score: sc, date: new Date().toLocaleDateString('ko-KR') });
+    list.sort((a, b) => b.score - a.score);
+    localStorage.setItem('jumpHeroRank', JSON.stringify(list.slice(0, 10)));
+  } catch(e) {}
 }
 
 // 버튼 히트 감지용
@@ -658,7 +660,7 @@ function update() {
     if (spikeAnim.timer >= spikeAnim.maxTimer) {
       spikeAnim = { active: false, timer: 0, maxTimer: 75, faceScale: 1 };
       pendingScore = score;
-      const savedName = localStorage.getItem('gameName');
+      const savedName = (() => { try { return localStorage.getItem('gameName'); } catch(e) { return null; } })();
       if (savedName) {
         saveRanking(savedName, pendingScore);
         gameState = 'ranking';
