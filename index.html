@@ -150,6 +150,16 @@ html, body {
 }
 .players-tag { font-size: 12px; color: #555; margin-top: 6px; }
 
+.badge-col {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 6px; flex-shrink: 0;
+}
+.rank-mini {
+  font-size: 11px; color: #999; text-align: right;
+  line-height: 1.4; white-space: nowrap;
+}
+.rank-mini .crown { color: #f1c40f; }
+
 .card-jump   { border-color: rgba(233,69,96,0.3); }
 .card-jump   .icon  { background: rgba(233,69,96,0.15); }
 .card-jump   .badge { background: rgba(233,69,96,0.2); color: #e94560; }
@@ -222,7 +232,10 @@ html, body {
         <p>장애물을 피하고 아이템을 먹어보세요! 버섯 먹으면 3배로 커져요.</p>
         <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 랭킹 있음</div>
       </div>
-      <div class="badge">런게임</div>
+      <div class="badge-col">
+        <div class="badge">런게임</div>
+        <div class="rank-mini" id="rank-jump"></div>
+      </div>
     </a>
     <a class="game-card card-memory" href="memory_game.html">
       <div class="icon">🧠</div>
@@ -231,7 +244,10 @@ html, body {
         <p>카드를 뒤집어 짝을 찾아요. 쉬움·보통·어려움 세 가지 난이도!</p>
         <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 난이도별 랭킹</div>
       </div>
-      <div class="badge">카드 게임</div>
+      <div class="badge-col">
+        <div class="badge">카드 게임</div>
+        <div class="rank-mini" id="rank-memory"></div>
+      </div>
     </a>
     <a class="game-card card-balance" href="balance_game.html">
       <div class="icon">⚖️</div>
@@ -240,7 +256,10 @@ html, body {
         <p>막대를 타이밍 맞춰 떨어트려 높이 쌓아요! 한쪽으로 기울면 무너집니다.</p>
         <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 균형 게임 &nbsp;·&nbsp; 랭킹 있음</div>
       </div>
-      <div class="badge">밸런스</div>
+      <div class="badge-col">
+        <div class="badge">밸런스</div>
+        <div class="rank-mini" id="rank-balance"></div>
+      </div>
     </a>
     <a class="game-card card-pacman" href="pacman_game.html">
       <div class="icon">👻</div>
@@ -249,7 +268,10 @@ html, body {
         <p>미로를 누비며 점을 모두 먹어요! 파워 펠릿으로 유령을 잡아보세요.</p>
         <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 스테이지 클리어 &nbsp;·&nbsp; 랭킹 있음</div>
       </div>
-      <div class="badge">아케이드</div>
+      <div class="badge-col">
+        <div class="badge">아케이드</div>
+        <div class="rank-mini" id="rank-pacman"></div>
+      </div>
     </a>
     <a class="game-card card-escape" href="escape_game.html">
       <div class="icon">🔐</div>
@@ -258,7 +280,10 @@ html, body {
         <p>5개의 방에 숨겨진 단서로 퍼즐을 풀고 탈출하세요! 10분 제한.</p>
         <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 퍼즐 / 스테이지 클리어 &nbsp;·&nbsp; 랭킹 있음</div>
       </div>
-      <div class="badge">방탈출</div>
+      <div class="badge-col">
+        <div class="badge">방탈출</div>
+        <div class="rank-mini" id="rank-escape"></div>
+      </div>
     </a>
     <a class="game-card card-reaction" href="reaction_battle.html">
       <div class="icon">⚡</div>
@@ -267,7 +292,9 @@ html, body {
         <p>신호가 뜨면 제일 먼저 눌러요! 각자 폰으로 접속해서 실시간 대결.</p>
         <div class="players-tag">👥 2~6인용 &nbsp;·&nbsp; 실시간 멀티플레이 &nbsp;·&nbsp; 랭킹 없음</div>
       </div>
-      <div class="badge">멀티플레이</div>
+      <div class="badge-col">
+        <div class="badge">멀티플레이</div>
+      </div>
     </a>
     <a class="game-card card-colorgrid" href="color_grid_game.html">
       <div class="icon">🎯</div>
@@ -276,7 +303,10 @@ html, body {
         <p>바둑판에서 지정된 색깔 타일만 빠르게 눌러 없애세요! 쉬움·보통·어려움.</p>
         <div class="players-tag">👤 1인용 &nbsp;·&nbsp; 난이도별 랭킹</div>
       </div>
-      <div class="badge">반응속도</div>
+      <div class="badge-col">
+        <div class="badge">반응속도</div>
+        <div class="rank-mini" id="rank-colorgrid"></div>
+      </div>
     </a>
   </div>
 
@@ -286,7 +316,7 @@ html, body {
 
 <script>
 // 배포할 때마다 올려서 게임 링크의 캐시를 강제로 새로고침시킨다
-const APP_VERSION = '2026.06.07-5';
+const APP_VERSION = '2026.06.07-6';
 document.getElementById('version-tag').textContent = '버전 v' + APP_VERSION;
 document.querySelectorAll('.game-card').forEach(a => {
   a.href = a.getAttribute('href') + '?v=' + APP_VERSION;
@@ -343,6 +373,67 @@ if (!localStorage.getItem('ranks_reset_v1')) {
   });
   localStorage.setItem('ranks_reset_v1', '1');
 }
+
+// 각 게임 카드에 1위 랭킹 미리보기 표시
+function _readRanks(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+function _setRankMini(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = text;
+}
+function _esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function _top1Line(list, valueFn) {
+  if (!list || !list.length) return '아직 기록 없음';
+  const top = list[0];
+  return `<span class="crown">🏆</span> ${_esc(top.name)} · ${_esc(valueFn(top))}`;
+}
+
+function renderRankPreviews() {
+  // 점프 히어로
+  _setRankMini('rank-jump', _top1Line(_readRanks('jump_rank'), r => r.score + '점'));
+
+  // 메모리 게임 (난이도 3개 중 가장 좋은 기록 1건)
+  (() => {
+    const grade = g => ['S','A','B','C'].indexOf(g);
+    let best = null;
+    ['easy','medium','hard'].forEach(lv => {
+      const list = _readRanks('memRank_' + lv);
+      if (!list.length) return;
+      const cand = list[0];
+      if (!best || grade(cand.grade) < grade(best.grade) ||
+          (grade(cand.grade) === grade(best.grade) && cand.seconds < best.seconds)) best = cand;
+    });
+    _setRankMini('rank-memory', best
+      ? `<span class="crown">🏆</span> ${_esc(best.name)} · ${_esc(best.grade)}등급 ${_esc(best.seconds)}초`
+      : '아직 기록 없음');
+  })();
+
+  // 밸런스 스택
+  _setRankMini('rank-balance', _top1Line(_readRanks('bstack_rank'), r => r.score + '층'));
+
+  // 팩맨
+  _setRankMini('rank-pacman', _top1Line(_readRanks('pacman_rank'), r => r.score + '점'));
+
+  // 방탈출
+  _setRankMini('rank-escape', _top1Line(_readRanks('escape_rank'), r => r.score + '점'));
+
+  // 색깔 격자 반응 (난이도 3개 중 최고 점수 1건)
+  (() => {
+    let best = null;
+    ['easy','hard','extreme'].forEach(mk => {
+      const list = _readRanks('cgame_rank_' + mk);
+      if (!list.length) return;
+      if (!best || list[0].score > best.score) best = list[0];
+    });
+    _setRankMini('rank-colorgrid', best
+      ? `<span class="crown">🏆</span> ${_esc(best.name)} · ${_esc(best.score)}점`
+      : '아직 기록 없음');
+  })();
+}
+renderRankPreviews();
 
 // 이미 이름 있으면 바로 허브로
 showHub();
