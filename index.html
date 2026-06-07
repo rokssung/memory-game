@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>🎮 게임 허브</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6366f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="게임 허브">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -331,6 +337,14 @@ if (!localStorage.getItem('ranks_reset_v1')) {
 
 // 이미 이름 있으면 바로 허브로
 showHub();
+</script>
+
+<script>
+// PWA 서비스 워커 등록
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js')
+    .catch(() => {}); // 실패해도 게임은 정상 동작
+}
 </script>
 </body>
 </html>
