@@ -221,6 +221,46 @@ html, body {
   font-size:15px; cursor:pointer;
 }
 
+/* 유이환 전용 힌트 */
+.kid-hint-toggle {
+  width:100%; margin-top:12px; padding:10px;
+  border:2px dashed rgba(251,191,36,.35);
+  border-radius:14px; background:rgba(251,191,36,.06);
+  color:#fbbf24; font-size:13px; font-weight:bold;
+  cursor:pointer; text-align:left;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.kid-hint-body {
+  display:none; margin-top:8px;
+  background:rgba(251,191,36,.08);
+  border-radius:12px; padding:12px 14px;
+}
+.kid-hint-body.open { display:block; }
+.kid-hint-body p { color:#fde68a; font-size:14px; line-height:1.8; }
+
+/* 해설 카드 */
+.explanation-card {
+  width:100%; max-width:360px;
+  background:rgba(34,197,94,.08);
+  border:2px solid rgba(34,197,94,.3);
+  border-radius:16px;
+  padding:18px 18px 14px;
+  animation:fadeIn .4s ease;
+}
+.explanation-card h3 { font-size:13px; color:#86efac; letter-spacing:1px; margin-bottom:8px; }
+.explanation-card p  { font-size:15px; color:#d1fae5; line-height:1.7; }
+.next-stage-btn {
+  width:100%; margin-top:12px; padding:14px;
+  border:none; border-radius:14px;
+  background:linear-gradient(135deg,#22c55e,#16a34a);
+  color:#fff; font-size:16px; font-weight:bold;
+  cursor:pointer;
+}
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
 @keyframes shake {
   0%,100%{ transform:translateX(0); }
   25%    { transform:translateX(-6px); }
@@ -257,6 +297,13 @@ html, body {
   <div class="hint-box">
     <h3>💡 힌트</h3>
     <p id="hint-text"></p>
+    <button class="kid-hint-toggle" id="kid-hint-toggle">
+      <span>🧒 유이환 전용 힌트</span>
+      <span id="kid-hint-arrow">▾</span>
+    </button>
+    <div class="kid-hint-body" id="kid-hint-body">
+      <p id="kid-hint-text"></p>
+    </div>
     <button class="hint-close" id="hint-close">닫기</button>
   </div>
 </div>
@@ -289,14 +336,15 @@ const STAGES = [
   {
     id: 1,
     name: '🔑 잠긴 방',
-    art: '🚪',
-    artSub: '낡은 나무 문이 잠겨 있다',
-    clue: '벽에 적힌 메모가 보인다:\n"<span class="clue-highlight">해가 뜨는 방향은 동쪽, 그 반대는 서쪽.\n시계의 동쪽은 3, 서쪽은 9.\n그 사이 정중앙을 더하면?</span>"',
-    hint: '시계에서 동쪽(3)과 서쪽(9)의 정중앙은 12와 6이에요. 3+9=12, 두 숫자를 더해보세요.',
+    art: '🐱🐶🐰',
+    artSub: '벽에 동물 그림이 그려져 있다',
+    clue: '벽화를 자세히 보니:\n"<span class="clue-highlight">🐱 고양이 3마리, 🐶 강아지 4마리, 🐰 토끼 2마리.\n동물 수를 순서대로 자물쇠에 입력하라!</span>"',
+    hint: '그림에 있는 동물 수를 순서대로 쓰면 됩니다. 고양이=3, 강아지=4, 토끼=2!',
+    kidHint: '고양이가 3마리야! 강아지가 4마리야! 토끼가 2마리야! 그 숫자를 순서대로 눌러봐: 3, 4, 2!',
     type: 'digits',
     digits: 3,
-    answer: [1, 2, 0],  // 3+9=12, 그 사이 정중앙: 12+6=18? 아니면 단순히 12 → 1,2,0?
-                         // 힌트 재확인: 3+9=12 → 자물쇠 코드 1,2,0
+    answer: [3, 4, 2],
+    explanation: '🐱 고양이 3마리 → 3, 🐶 강아지 4마리 → 4, 🐰 토끼 2마리 → 2. 자물쇠 코드: 3-4-2! 문이 열렸다! 🔓',
   },
   {
     id: 2,
@@ -304,22 +352,26 @@ const STAGES = [
     art: '📚🕯️🗺️',
     artSub: '책과 촛불, 그리고 낡은 지도',
     clue: '책장에서 쪽지를 발견했다:\n"<span class="clue-highlight">나는 숫자가 없지만 시간을 말한다.\n나는 소리도 없지만 움직인다.\n하루에 두 번 멈추는 것은?</span>"',
-    hint: '그림자입니다! 정답 선택지에서 그림자와 관련된 답을 찾아보세요.',
+    hint: '정답은 그림자! 그림자는 빛이 없으면 사라져서 밤에 두 번(해뜨기 전, 해진 후) 보이지 않아요.',
+    kidHint: '낮에 밖에 나가면 발 옆에 생기는 까만 것이야! 해가 있을 때만 보이고, 밤엔 사라지잖아. 시계? 바람? 아니야! 정답은 두 번째 보기야!',
     type: 'choice',
     question: '수수께끼의 정답은?',
     choices: ['시계', '그림자', '바람', '달'],
-    answer: 1, // 그림자
+    answer: 1,
+    explanation: '정답은 그림자! 그림자는 시계 없이도 시간을 알려주고(해 위치로), 소리 없이 움직여요. 밤에는 빛이 없어서 사라지기 때문에 "하루에 두 번 멈춘다"고 했어요! 🌑',
   },
   {
     id: 3,
     name: '🔬 실험실',
     art: '⚗️🧪🔬',
     artSub: '색깔 액체가 담긴 시험관들',
-    clue: '실험 노트에 순서가 적혀 있다:\n"<span class="clue-highlight">무지개의 색을 역순으로 섞어라.\n보라→남→파→초→노→주→빨</span>"',
-    hint: '무지개 역순: 보라, 남색, 파랑, 초록, 노랑, 주황, 빨강. 시험관을 이 순서로 정렬하세요.',
+    clue: '실험 노트에 순서가 적혀 있다:\n"<span class="clue-highlight">무지개의 색을 역순으로 섞어라.\n(보라→파→초→노→주→빨) 순서로!</span>"',
+    hint: '무지개 역순: 보라, 파랑, 초록, 노랑, 주황, 빨강. 목록에 보이는 순서 그대로 선택하면 정답!',
+    kidHint: '무지개를 거꾸로 해봐! 보통은 빨-주-노-초-파-보 인데, 역순은 보-파-초-노-주-빨이야! 목록 맨 위 보라색부터 순서대로 선택해봐!',
     type: 'order',
     items: ['🟣 보라', '🔵 파랑', '🟢 초록', '🟡 노랑', '🟠 주황', '🔴 빨강'],
-    answer: [0, 1, 2, 3, 4, 5], // 그대로가 정답 (보라→파→초→노→주→빨, 남색 제외 표시)
+    answer: [0, 1, 2, 3, 4, 5],
+    explanation: '무지개 정순: 빨강→주황→노랑→초록→파랑→보라. 역순: 보라→파랑→초록→노랑→주황→빨강! 목록이 이미 역순 순서로 되어 있었어요! 🌈',
   },
   {
     id: 4,
@@ -327,21 +379,25 @@ const STAGES = [
     art: '🎹🎶🎸',
     artSub: '악기들이 가득한 방',
     clue: '악보 위에 메모가 있다:\n"<span class="clue-highlight">도(1) 레(2) 미(3) 파(4) 솔(5)\n연주 순서: 솔-미-도-파-레\n각 음의 번호를 순서대로 쓰면?</span>"',
-    hint: '솔=5, 미=3, 도=1, 파=4, 레=2. 순서대로 쓰면 5-3-1-4-2 → 자물쇠는 5자리!',
+    hint: '솔=5, 미=3, 도=1, 파=4, 레=2. 연주 순서 그대로 5-3-1-4-2!',
+    kidHint: '도=1, 레=2, 미=3, 파=4, 솔=5 로 외워봐! 악보에 솔-미-도-파-레 순서니까: 솔은 5, 미는 3, 도는 1, 파는 4, 레는 2. 5, 3, 1, 4, 2 를 눌러봐!',
     type: 'digits',
     digits: 5,
     answer: [5, 3, 1, 4, 2],
+    explanation: '도(1)-레(2)-미(3)-파(4)-솔(5). 악보 연주 순서 솔-미-도-파-레를 숫자로 바꾸면 5-3-1-4-2! 🎵',
   },
   {
     id: 5,
     name: '🚪 최종 관문',
     art: '🔐✨',
     artSub: '출구 앞 마지막 자물쇠',
-    clue: '지금까지 지나온 방의 번호를 모두 더하면?\n<span class="clue-highlight">1번 방의 코드 첫 자리 + 2번 방 정답 번호(0부터) + 3번 방 첫 순서 색 번호(0부터) + 4번 방 코드 첫 자리</span>',
-    hint: '1번:1, 2번:1(그림자=index 1), 3번:0(보라=index 0), 4번:5. 합계 = 1+1+0+5 = 7. 자물쇠는 0,0,7.',
+    clue: '마지막 자물쇠에 수수께끼가 적혀 있다:\n"<span class="clue-highlight">1번 방에서 처음 입력한 숫자와\n4번 방에서 처음 입력한 숫자를 더하라!</span>"',
+    hint: '1번방 코드 첫 자리: 3, 4번방 코드 첫 자리: 5. 3 + 5 = 8 → 자물쇠 코드는 0, 0, 8!',
+    kidHint: '1번방에서 처음 누른 숫자가 3이었어! 4번방에서 처음 누른 숫자가 5였어! 3 더하기 5는 8이야! 자물쇠에 0, 0, 8 눌러봐!',
     type: 'digits',
     digits: 3,
-    answer: [0, 0, 7],
+    answer: [0, 0, 8],
+    explanation: '1번방 코드 첫 자리(3) + 4번방 코드 첫 자리(5) = 8. 마지막 자물쇠 코드: 0-0-8! 🎉 탈출 성공!',
   },
 ];
 
@@ -439,6 +495,9 @@ function renderStage() {
   document.getElementById('stage-info').textContent = `STAGE ${st.id} / ${STAGES.length}`;
   document.getElementById('stage-name').textContent = st.name;
   document.getElementById('hint-text').textContent = st.hint;
+  document.getElementById('kid-hint-text').textContent = st.kidHint || '';
+  document.getElementById('kid-hint-body').classList.remove('open');
+  document.getElementById('kid-hint-arrow').textContent = '▾';
 
   const view = document.getElementById('room-view');
   view.innerHTML = '';
@@ -499,7 +558,7 @@ function renderDigitPuzzle(view, st) {
       fb.textContent = '✅ 정답!';
       fb.className = 'feedback ok';
       btn.disabled = true;
-      setTimeout(() => nextStage(), 800);
+      showExplanation(view, st);
     } else {
       fb.textContent = '❌ 틀렸어요. 다시 시도해보세요.';
       fb.className = 'feedback err';
@@ -534,7 +593,7 @@ function renderChoicePuzzle(view, st) {
       if (i === st.answer) {
         btn.classList.add('correct');
         fb.textContent = '✅ 정답!'; fb.className = 'feedback ok';
-        setTimeout(() => nextStage(), 800);
+        showExplanation(view, st);
       } else {
         btn.classList.add('wrong');
         fb.textContent = '❌ 틀렸어요!'; fb.className = 'feedback err';
@@ -604,7 +663,7 @@ function renderOrderPuzzle(view, st) {
     if (correct) {
       fb.textContent = '✅ 정답!'; fb.className = 'feedback ok';
       btn.disabled = true;
-      setTimeout(() => nextStage(), 800);
+      showExplanation(view, st);
     } else {
       fb.textContent = '❌ 순서가 틀렸어요. 다시 선택해보세요.';
       fb.className = 'feedback err';
@@ -621,6 +680,20 @@ function renderOrderPuzzle(view, st) {
   view.appendChild(area);
 }
 
+// ── 해설 카드 표시
+function showExplanation(view, st) {
+  const card = document.createElement('div');
+  card.className = 'explanation-card';
+  card.innerHTML = `<h3>📖 해설</h3><p>${st.explanation}</p>`;
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'next-stage-btn';
+  nextBtn.textContent = currentStage + 1 >= STAGES.length ? '🎉 탈출하기!' : '다음 방으로 →';
+  nextBtn.addEventListener('pointerdown', () => nextStage());
+  card.appendChild(nextBtn);
+  view.appendChild(card);
+  setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+}
+
 // ── 다음 스테이지 or 클리어
 function nextStage() {
   currentStage++;
@@ -635,6 +708,12 @@ function nextStage() {
 // ── 힌트
 document.getElementById('hint-btn').addEventListener('click', () => {
   document.getElementById('hint-modal').classList.add('on');
+});
+document.getElementById('kid-hint-toggle').addEventListener('click', () => {
+  const body = document.getElementById('kid-hint-body');
+  const arrow = document.getElementById('kid-hint-arrow');
+  body.classList.toggle('open');
+  arrow.textContent = body.classList.contains('open') ? '▴' : '▾';
 });
 document.getElementById('hint-close').addEventListener('click', () => {
   document.getElementById('hint-modal').classList.remove('on');
